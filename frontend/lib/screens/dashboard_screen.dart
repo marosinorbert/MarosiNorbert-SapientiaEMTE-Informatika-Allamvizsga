@@ -22,33 +22,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = true;
   String? _error;
 
-  List<FlSpot> get _tempSpots => List.generate(
-        13,
-        (i) => FlSpot(
-          i.toDouble(),
-          20 +
-              (i % 3 == 0
-                  ? 4.5
-                  : i % 3 == 1
-                      ? 3.0
-                      : 5.0),
-        ),
-      );
-
-  List<FlSpot> get _humiditySpots => List.generate(
-        13,
-        (i) => FlSpot(
-          i.toDouble(),
-          58 +
-              (i % 4 == 0
-                  ? 4.0
-                  : i % 4 == 1
-                      ? 2.0
-                      : i % 4 == 2
-                          ? 5.0
-                          : 3.0),
-        ),
-      );
+  List<FlSpot> _tempSpots = [];
+  List<FlSpot> _humiditySpots = [];
 
   @override
   void initState() {
@@ -58,17 +33,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadSensorData() async {
     try {
-      final json = await ApiService.getLatestSensorData();
+      final latestJson = await ApiService.getLatestSensorData();
+      final historyJson = await ApiService.getSensorHistory();
+
+      final tempSpots = <FlSpot>[];
+      final humiditySpots = <FlSpot>[];
+
+      for (int i = 0; i < historyJson.length; i++) {
+        final item = historyJson[i];
+
+        tempSpots.add(
+          FlSpot(
+            i.toDouble(),
+            (item['temperature'] ?? 0).toDouble(),
+          ),
+        );
+
+        humiditySpots.add(
+          FlSpot(
+            i.toDouble(),
+            (item['humidity'] ?? 0).toDouble(),
+          ),
+        );
+      }
 
       setState(() {
         _data = SensorData(
-          temperature: (json['temperature'] ?? 0).toDouble(),
-          humidity: (json['humidity'] ?? 0).toDouble(),
-          soilMoisture: (json['soilMoisture'] ?? 0).toDouble(),
+          temperature: (latestJson['temperature'] ?? 0).toDouble(),
+          humidity: (latestJson['humidity'] ?? 0).toDouble(),
+          soilMoisture: (latestJson['soilMoisture'] ?? 0).toDouble(),
           lightIntensity: 0,
-          lastUpdated: json['createdAt'] ?? 'Most',
+          lastUpdated: latestJson['createdAt'] ?? 'Most',
         );
 
+        _tempSpots = tempSpots;
+        _humiditySpots = humiditySpots;
         _isLoading = false;
       });
     } catch (e) {
@@ -247,19 +246,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               ChartCard(
                 title: 'Hőmérséklet',
-                spots: _tempSpots,
+                spots: _tempSpots.isEmpty ? [const FlSpot(0, 0)] : _tempSpots,
                 lineColor: AppTheme.primary,
                 fillColor: AppTheme.primary.withOpacity(0.1),
                 minY: 0,
-                maxY: 28,
+                maxY: 40,
               ),
               ChartCard(
                 title: 'Páratartalom',
-                spots: _humiditySpots,
+                spots: _humiditySpots.isEmpty
+                    ? [const FlSpot(0, 0)]
+                    : _humiditySpots,
                 lineColor: const Color(0xFF60A5FA),
                 fillColor: const Color(0xFF60A5FA).withOpacity(0.1),
                 minY: 0,
-                maxY: 80,
+                maxY: 100,
               ),
             ],
           ),
