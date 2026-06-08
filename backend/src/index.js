@@ -1,3 +1,4 @@
+const pool = require('./db');
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
@@ -11,8 +12,12 @@ app.use(express.json());
 
 app.use('/api/sensors', sensorRoutes);
 
-app.get('/', (req, res) => {
-  res.send('Smart Greenhouse API is running');
+app.get('/', async (req, res) => {
+  const result = await pool.query('SELECT NOW()');
+  res.json({
+    message: 'Smart Greenhouse API is running',
+    databaseTime: result.rows[0].now,
+  });
 });
 
 const PORT = process.env.PORT || 3000;
