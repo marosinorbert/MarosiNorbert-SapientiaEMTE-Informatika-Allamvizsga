@@ -13,6 +13,24 @@ async function initDb() {
     );
   `);
 
+  await pool.query(`
+  CREATE TABLE IF NOT EXISTS device_state (
+    id SERIAL PRIMARY KEY,
+    device_name VARCHAR(50) UNIQUE NOT NULL,
+    is_on BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+await pool.query(`
+  INSERT INTO device_state (device_name, is_on)
+  VALUES
+    ('pump', false),
+    ('light', false),
+    ('fan', false),
+    ('heater', false)
+  ON CONFLICT (device_name) DO NOTHING;
+`);
   console.log('Database initialized');
 }
 
