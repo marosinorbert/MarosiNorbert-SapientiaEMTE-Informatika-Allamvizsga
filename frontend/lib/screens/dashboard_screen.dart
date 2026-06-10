@@ -35,6 +35,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final latestJson = await ApiService.getLatestSensorData();
       final historyJson = await ApiService.getSensorHistory();
+      final devicesJson = await ApiService.getDevices();
 
       final tempSpots = <FlSpot>[];
       final humiditySpots = <FlSpot>[];
@@ -57,6 +58,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       }
 
+      for (final deviceJson in devicesJson) {
+        final deviceName = deviceJson['device_name'];
+        final isOn = deviceJson['is_on'];
+
+        if (deviceName == 'pump') {
+          _devices.firstWhere((d) => d.name == 'Öntözőrendszer').isOn = isOn;
+        }
+
+        if (deviceName == 'light') {
+          _devices.firstWhere((d) => d.name == 'Növénylámpa').isOn = isOn;
+        }
+
+        if (deviceName == 'fan') {
+          _devices.firstWhere((d) => d.name == 'Szellőzés').isOn = isOn;
+        }
+
+        if (deviceName == 'heater') {
+          _devices.firstWhere((d) => d.name == 'Fűtés').isOn = isOn;
+        }
+      }
+
       setState(() {
         _data = SensorData(
           temperature: (latestJson['temperature'] ?? 0).toDouble(),
@@ -75,6 +97,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _error = 'Nem sikerült betölteni az adatokat: $e';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _toggleDevice(int index) async {
+    final device = _devices[index];
+
+    String apiDeviceName;
+
+    switch (device.name) {
+      case 'Öntözőrendszer':
+        apiDeviceName = 'pump';
+        break;
+      case 'Növénylámpa':
+        apiDeviceName = 'light';
+        break;
+      case 'Szellőzés':
+        apiDeviceName = 'fan';
+        break;
+      case 'Fűtés':
+        apiDeviceName = 'heater';
+        break;
+      default:
+        return;
+    }
+
+    final newValue = !device.isOn;
+
+    setState(() {
+      _devices[index].isOn = newValue;
+    });
+
+    try {
+      await ApiService.toggleDevice(apiDeviceName, newValue);
+    } catch (e) {
+      setState(() {
+        _devices[index].isOn = !newValue;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Nem sikerült kapcsolni: $e'),
+        ),
+      );
     }
   }
 
@@ -223,8 +288,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: DeviceCard(
                   device: e.value,
-                  onToggle: () => setState(
-                      () => _devices[e.key].isOn = !_devices[e.key].isOn),
+                  onToggle: () => _toggleDevice(e.key),
                 ),
               )),
 
