@@ -3,10 +3,9 @@ const initDb = require('./initDb');
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-
 const sensorRoutes = require('./routes/sensorRoutes');
-
 const app = express();
+const deviceRoutes = require('./routes/deviceRoutes');
 
 app.use(cors({
   origin: '*',
@@ -16,6 +15,7 @@ app.use(cors({
 app.use(express.json());
 
 app.use('/api/sensors', sensorRoutes);
+app.use('/api/devices', deviceRoutes);
 
 app.get('/', async (req, res) => {
   const result = await pool.query('SELECT NOW()');
