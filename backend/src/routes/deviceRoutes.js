@@ -27,6 +27,15 @@ router.post('/:device', async (req, res) => {
     [isOn, device]
   );
 
+  const deviceLabels = {
+    pump: 'Öntözőrendszer',
+    light: 'Növénylámpa',
+    fan: 'Szellőzés',
+    heater: 'Fűtés',
+  };
+
+  const deviceLabel = deviceLabels[device] || device;
+
   await pool.query(
     `
   INSERT INTO system_logs (type, title, description)
@@ -34,7 +43,7 @@ router.post('/:device', async (req, res) => {
   `,
     [
       'device',
-      `${device} ${isOn ? 'bekapcsolva' : 'kikapcsolva'}`,
+      `${deviceLabel} ${isOn ? 'bekapcsolva' : 'kikapcsolva'}`,
       `Az eszköz állapota manuálisan módosítva lett.`,
     ]
   );
