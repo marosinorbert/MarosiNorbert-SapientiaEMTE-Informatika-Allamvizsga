@@ -669,9 +669,9 @@ class _DeviceStatsTable extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Table(
         columnWidths: const {
-          0: FlexColumnWidth(2),
-          1: FlexColumnWidth(1.5),
-          2: FlexColumnWidth(1.5),
+          0: FlexColumnWidth(2.4),
+          1: FlexColumnWidth(1.2),
+          2: FlexColumnWidth(1.2),
         },
         children: [
           // Header
@@ -712,12 +712,16 @@ class _DeviceStatsTable extends StatelessWidget {
                         children: [
                           Icon(e.value.icon, size: 16, color: AppTheme.primary),
                           const SizedBox(width: 8),
-                          Text(
-                            e.value.name,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimary,
+                          Expanded(
+                            child: Text(
+                              e.value.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textPrimary,
+                              ),
                             ),
                           ),
                         ],
