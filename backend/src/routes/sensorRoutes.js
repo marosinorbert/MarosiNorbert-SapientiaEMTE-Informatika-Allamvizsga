@@ -27,6 +27,7 @@ router.get('/history', async (req, res) => {
     temperature: Number(row.temperature),
     humidity: Number(row.humidity),
     soilMoisture: Number(row.soil_moisture),
+    waterAvailable: row.water_available,
     lightOn: row.light_on,
     pumpOn: row.pump_on,
     createdAt: row.created_at,
@@ -48,6 +49,7 @@ router.get('/', async (req, res) => {
       temperature: 0,
       humidity: 0,
       soilMoisture: 0,
+      waterAvailable: true,
       lightOn: false,
       pumpOn: false,
     });
@@ -59,6 +61,7 @@ router.get('/', async (req, res) => {
     temperature: Number(row.temperature),
     humidity: Number(row.humidity),
     soilMoisture: Number(row.soil_moisture),
+    waterAvailable: row.water_available,
     lightOn: row.light_on,
     pumpOn: row.pump_on,
     createdAt: row.created_at,
@@ -70,18 +73,19 @@ router.post('/', async (req, res) => {
     temperature,
     humidity,
     soilMoisture,
+    waterDetected = true,
     lightOn = false,
     pumpOn = false,
   } = req.body;
 
   const result = await pool.query(
     `
-    INSERT INTO sensor_data 
-    (temperature, humidity, soil_moisture, light_on, pump_on)
-    VALUES ($1, $2, $3, $4, $5)
-    RETURNING *
+INSERT INTO sensor_data 
+(temperature, humidity, soil_moisture, light_on, pump_on)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING *
     `,
-    [temperature, humidity, soilMoisture, lightOn, pumpOn]
+    [temperature, humidity, soilMoisture, waterDetected, lightOn, pumpOn]
   );
 
   await pool.query(
@@ -181,6 +185,15 @@ router.post('/', async (req, res) => {
         'Talajnedvesség'
       );
     }
+
+    if (!waterDetected) {
+      await createAlertIfNeeded(
+        'Nincs víz a tartályban',
+        'Az öntözőrendszer víztartályában nincs elegendő víz. Az öntözés letiltva.',
+        'critical',
+        'Víztartály'
+      );
+    }
   }
 
   async function updateDeviceStateIfAuto(deviceName, isOn) {
@@ -198,7 +211,7 @@ router.post('/', async (req, res) => {
 
   if (settings) {
     // Öntözés automatika
-    if (soilMoisture < Number(settings.soil_min)) {
+    if (soilMoisture < Number(settings.soil_min) && waterDetected) {
       await updateDeviceStateIfAuto('pump', true);
 
       await createAlertIfNeeded(

@@ -14,6 +14,11 @@ async function initDb() {
   `);
 
   await pool.query(`
+  ALTER TABLE sensor_data
+  ADD COLUMN IF NOT EXISTS water_detected BOOLEAN DEFAULT true;
+`);
+
+  await pool.query(`
   CREATE TABLE IF NOT EXISTS device_state (
     id SERIAL PRIMARY KEY,
     device_name VARCHAR(50) UNIQUE NOT NULL,
