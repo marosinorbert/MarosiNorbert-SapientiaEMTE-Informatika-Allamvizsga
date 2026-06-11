@@ -22,23 +22,29 @@ router.post('/', async (req, res) => {
     soilMax,
     lightMin,
     lightMax,
+    darkMode,
+    language,
+    tempUnit,
   } = req.body;
 
   const result = await pool.query(
     `
-    UPDATE system_settings
-    SET
-      temp_min = $1,
-      temp_max = $2,
-      humidity_min = $3,
-      humidity_max = $4,
-      soil_min = $5,
-      soil_max = $6,
-      light_min = $7,
-      light_max = $8,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = 1
-    RETURNING *
+UPDATE system_settings
+SET
+  temp_min = $1,
+  temp_max = $2,
+  humidity_min = $3,
+  humidity_max = $4,
+  soil_min = $5,
+  soil_max = $6,
+  light_min = $7,
+  light_max = $8,
+  dark_mode = $9,
+  language = $10,
+  temp_unit = $11,
+  updated_at = CURRENT_TIMESTAMP
+WHERE id = 1
+RETURNING *
     `,
     [
       tempMin,
@@ -49,6 +55,9 @@ router.post('/', async (req, res) => {
       soilMax,
       lightMin,
       lightMax,
+      darkMode,
+      language,
+      tempUnit,
     ]
   );
 

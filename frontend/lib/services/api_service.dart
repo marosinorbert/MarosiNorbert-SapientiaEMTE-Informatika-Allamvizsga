@@ -102,6 +102,9 @@ class ApiService {
     required double soilMax,
     required double lightMin,
     required double lightMax,
+    required bool darkMode,
+    required String language,
+    required String tempUnit,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/settings'),
@@ -115,6 +118,9 @@ class ApiService {
         'soilMax': soilMax,
         'lightMin': lightMin,
         'lightMax': lightMax,
+        'darkMode': darkMode,
+        'language': language,
+        'tempUnit': tempUnit,
       }),
     );
 

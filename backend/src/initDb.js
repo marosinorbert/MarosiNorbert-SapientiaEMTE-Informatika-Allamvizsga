@@ -135,6 +135,21 @@ async function initDb() {
 `);
 
   await pool.query(`
+  ALTER TABLE system_settings
+  ADD COLUMN IF NOT EXISTS dark_mode BOOLEAN DEFAULT false;
+`);
+
+  await pool.query(`
+  ALTER TABLE system_settings
+  ADD COLUMN IF NOT EXISTS language VARCHAR(10) DEFAULT 'hu';
+`);
+
+  await pool.query(`
+  ALTER TABLE system_settings
+  ADD COLUMN IF NOT EXISTS temp_unit VARCHAR(10) DEFAULT '°C';
+`);
+
+  await pool.query(`
   CREATE TABLE IF NOT EXISTS esp32_status (
     id SERIAL PRIMARY KEY,
     is_online BOOLEAN DEFAULT false,

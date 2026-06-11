@@ -103,6 +103,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _lightMin = _toDouble(settings['light_min'], 800);
         _lightMax = _toDouble(settings['light_max'], 3000);
 
+        _darkMode = settings['dark_mode'] ?? false;
+        _language = settings['language'] ?? 'hu';
+        _tempUnit = settings['temp_unit'] ?? '°C';
+
         _isLoading = false;
       });
     } catch (e) {
@@ -124,6 +128,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         soilMax: _soilMax,
         lightMin: _lightMin,
         lightMax: _lightMax,
+        darkMode: _darkMode,
+        language: _language,
+        tempUnit: _tempUnit,
       );
 
       if (!mounted) return;
