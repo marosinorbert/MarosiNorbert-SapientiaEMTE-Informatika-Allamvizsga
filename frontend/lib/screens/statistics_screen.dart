@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 enum TimeRange { daily, weekly, monthly }
 
@@ -36,57 +37,58 @@ class StatisticsScreen extends StatefulWidget {
 class _StatisticsScreenState extends State<StatisticsScreen> {
   TimeRange _timeRange = TimeRange.daily;
 
-  // Dummy stats for different time ranges
-  Map<TimeRange, _SensorStats> get _tempStats => {
-    TimeRange.daily: _SensorStats(min: 18.2, max: 27.8, avg: 23.1),
-    TimeRange.weekly: _SensorStats(min: 16.5, max: 28.9, avg: 22.4),
-    TimeRange.monthly: _SensorStats(min: 14.2, max: 31.5, avg: 21.8),
-  };
+  bool _isLoading = true;
+  String? _error;
 
-  Map<TimeRange, _SensorStats> get _humidityStats => {
-    TimeRange.daily: _SensorStats(min: 54, max: 71, avg: 62),
-    TimeRange.weekly: _SensorStats(min: 48, max: 78, avg: 61),
-    TimeRange.monthly: _SensorStats(min: 42, max: 85, avg: 60),
-  };
+  _SensorStats _tempStats = _SensorStats(min: 0, max: 0, avg: 0);
+  _SensorStats _humidityStats = _SensorStats(min: 0, max: 0, avg: 0);
+  _SensorStats _soilStats = _SensorStats(min: 0, max: 0, avg: 0);
+  _SensorStats _lightStats = _SensorStats(min: 0, max: 0, avg: 0);
 
-  Map<TimeRange, _SensorStats> get _soilStats => {
-    TimeRange.daily: _SensorStats(min: 38, max: 60, avg: 47),
-    TimeRange.weekly: _SensorStats(min: 35, max: 65, avg: 48),
-    TimeRange.monthly: _SensorStats(min: 30, max: 70, avg: 46),
-  };
-
-  Map<TimeRange, _SensorStats> get _lightStats => {
-    TimeRange.daily: _SensorStats(min: 800, max: 18400, avg: 11200),
-    TimeRange.weekly: _SensorStats(min: 500, max: 19200, avg: 10800),
-    TimeRange.monthly: _SensorStats(min: 200, max: 20000, avg: 10500),
-  };
+  List<FlSpot> _tempSpots = [];
 
   List<_DeviceStats> get _deviceStats => [
-  _DeviceStats(
-    name: 'Szellőzés',
-    icon: Icons.air_rounded,
-    switchCount: _timeRange == TimeRange.daily ? 3 : (_timeRange == TimeRange.weekly ? 18 : 85),
-    hoursOn: _timeRange == TimeRange.daily ? 8 : (_timeRange == TimeRange.weekly ? 52 : 220),
-  ),
-  _DeviceStats(
-    name: 'Öntözőrendszer',
-    icon: Icons.water_drop_rounded,
-    switchCount: _timeRange == TimeRange.daily ? 2 : (_timeRange == TimeRange.weekly ? 12 : 58),
-    hoursOn: _timeRange == TimeRange.daily ? 1 : (_timeRange == TimeRange.weekly ? 6 : 26),
-  ),
-  _DeviceStats(
-    name: 'Növénylámpa',
-    icon: Icons.light_mode_rounded,
-    switchCount: _timeRange == TimeRange.daily ? 2 : (_timeRange == TimeRange.weekly ? 14 : 60),
-    hoursOn: _timeRange == TimeRange.daily ? 14 : (_timeRange == TimeRange.weekly ? 98 : 420),
-  ),
-  _DeviceStats(
-    name: 'Fűtés',
-    icon: Icons.local_fire_department_rounded,
-    switchCount: _timeRange == TimeRange.daily ? 0 : (_timeRange == TimeRange.weekly ? 2 : 8),
-    hoursOn: _timeRange == TimeRange.daily ? 0 : (_timeRange == TimeRange.weekly ? 2 : 18),
-  ),
-];
+        _DeviceStats(
+          name: 'Szellőzés',
+          icon: Icons.air_rounded,
+          switchCount: _timeRange == TimeRange.daily
+              ? 3
+              : (_timeRange == TimeRange.weekly ? 18 : 85),
+          hoursOn: _timeRange == TimeRange.daily
+              ? 8
+              : (_timeRange == TimeRange.weekly ? 52 : 220),
+        ),
+        _DeviceStats(
+          name: 'Öntözőrendszer',
+          icon: Icons.water_drop_rounded,
+          switchCount: _timeRange == TimeRange.daily
+              ? 2
+              : (_timeRange == TimeRange.weekly ? 12 : 58),
+          hoursOn: _timeRange == TimeRange.daily
+              ? 1
+              : (_timeRange == TimeRange.weekly ? 6 : 26),
+        ),
+        _DeviceStats(
+          name: 'Növénylámpa',
+          icon: Icons.light_mode_rounded,
+          switchCount: _timeRange == TimeRange.daily
+              ? 2
+              : (_timeRange == TimeRange.weekly ? 14 : 60),
+          hoursOn: _timeRange == TimeRange.daily
+              ? 14
+              : (_timeRange == TimeRange.weekly ? 98 : 420),
+        ),
+        _DeviceStats(
+          name: 'Fűtés',
+          icon: Icons.local_fire_department_rounded,
+          switchCount: _timeRange == TimeRange.daily
+              ? 0
+              : (_timeRange == TimeRange.weekly ? 2 : 8),
+          hoursOn: _timeRange == TimeRange.daily
+              ? 0
+              : (_timeRange == TimeRange.weekly ? 2 : 18),
+        ),
+      ];
 
   String _timeRangeLabel(TimeRange tr) {
     switch (tr) {
@@ -110,28 +112,95 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     }
   }
 
-  // Dummy trend data
-  List<FlSpot> _generateTrendData(TimeRange tr) {
-    final points = _timeRangeValue(tr);
-    return List.generate(
-      points,
-      (i) => FlSpot(
-        i.toDouble(),
-        20 + (i % 3 == 0 ? 7 : i % 3 == 1 ? 4 : 6),
-      ),
-    );
+  @override
+  void initState() {
+    super.initState();
+    _loadStatistics();
+  }
+
+  Future<void> _loadStatistics() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      List<dynamic> history;
+
+      if (_timeRange == TimeRange.daily) {
+        history = await ApiService.getSensorHistory(hours: 24);
+      } else if (_timeRange == TimeRange.weekly) {
+        history = await ApiService.getSensorHistory(days: 7);
+      } else {
+        history = await ApiService.getSensorHistory(days: 30);
+      }
+
+      final temperatures = history
+          .map<double>((e) => (e['temperature'] ?? 0).toDouble())
+          .toList();
+
+      final humidities =
+          history.map<double>((e) => (e['humidity'] ?? 0).toDouble()).toList();
+
+      final soilValues = history
+          .map<double>((e) => (e['soilMoisture'] ?? 0).toDouble())
+          .toList();
+
+      _SensorStats calculateStats(List<double> values) {
+        if (values.isEmpty) {
+          return _SensorStats(min: 0, max: 0, avg: 0);
+        }
+
+        final min = values.reduce((a, b) => a < b ? a : b);
+        final max = values.reduce((a, b) => a > b ? a : b);
+        final avg = values.reduce((a, b) => a + b) / values.length;
+
+        return _SensorStats(min: min, max: max, avg: avg);
+      }
+
+      final tempSpots = <FlSpot>[];
+
+      for (int i = 0; i < temperatures.length; i++) {
+        tempSpots.add(
+          FlSpot(i.toDouble(), temperatures[i]),
+        );
+      }
+
+      setState(() {
+        _tempStats = calculateStats(temperatures);
+        _humidityStats = calculateStats(humidities);
+        _soilStats = calculateStats(soilValues);
+
+        // Fényszenzorod még nincs adatbázisban, ezért egyelőre 0.
+        _lightStats = _SensorStats(min: 0, max: 0, avg: 0);
+
+        _tempSpots = tempSpots;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Nem sikerült betölteni a statisztikákat: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final tempStats = _tempStats[_timeRange]!;
-    final humidityStats = _humidityStats[_timeRange]!;
-    final soilStats = _soilStats[_timeRange]!;
-    final lightStats = _lightStats[_timeRange]!;
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
+    if (_error != null) {
+      return Center(child: Text(_error!));
+    }
+    final tempStats = _tempStats;
+    final humidityStats = _humidityStats;
+    final soilStats = _soilStats;
+    final lightStats = _lightStats;
 
-  return SingleChildScrollView(
-    child: Column(
+    return SingleChildScrollView(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
@@ -167,22 +236,24 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
           // Time range selector
           SingleChildScrollView(
-  scrollDirection: Axis.horizontal,
-  child: Row(
-    children: TimeRange.values
-                .map((tr) => Padding(
-                      padding: EdgeInsets.only(
-                        right:
-                            tr == TimeRange.values.last ? 0 : 12,
-                      ),
-                      child: _TimeRangeButton(
-                        label: _timeRangeLabel(tr),
-                        isSelected: _timeRange == tr,
-                        onTap: () => setState(() => _timeRange = tr),
-                      ),
-                    ))
-                .toList(),
-          ),
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: TimeRange.values
+                  .map((tr) => Padding(
+                        padding: EdgeInsets.only(
+                          right: tr == TimeRange.values.last ? 0 : 12,
+                        ),
+                        child: _TimeRangeButton(
+                          label: _timeRangeLabel(tr),
+                          isSelected: _timeRange == tr,
+                          onTap: () {
+                            setState(() => _timeRange = tr);
+                            _loadStatistics();
+                          },
+                        ),
+                      ))
+                  .toList(),
+            ),
           ),
 
           const SizedBox(height: 24),
@@ -223,8 +294,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     color: const Color(0xFF60A5FA),
                     min: '${humidityStats.min.toInt()}%',
                     max: '${humidityStats.max.toInt()}%',
-                    avg:
-                        '${humidityStats.avg.toStringAsFixed(1)}%',
+                    avg: '${humidityStats.avg.toStringAsFixed(1)}%',
                   ),
                   _StatCard(
                     title: 'Talajnedvesség',
@@ -232,8 +302,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     color: const Color(0xFF8B5CF6),
                     min: '${soilStats.min.toInt()}%',
                     max: '${soilStats.max.toInt()}%',
-                    avg:
-                        '${soilStats.avg.toStringAsFixed(1)}%',
+                    avg: '${soilStats.avg.toStringAsFixed(1)}%',
                   ),
                   _StatCard(
                     title: 'Fényerő',
@@ -241,8 +310,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     color: const Color(0xFFFCD34D),
                     min: '${lightStats.min.toInt()} lux',
                     max: '${lightStats.max.toInt()} lux',
-                    avg:
-                        '${lightStats.avg.toInt()} lux',
+                    avg: '${lightStats.avg.toInt()} lux',
                   ),
                 ],
               );
@@ -262,7 +330,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           ),
           const SizedBox(height: 14),
           _TrendChart(
-            spots: _generateTrendData(_timeRange),
+            spots: _tempSpots.isEmpty ? [const FlSpot(0, 0)] : _tempSpots,
             timeRange: _timeRange,
             lineColor: AppTheme.primary,
             fillColor: AppTheme.primary.withOpacity(0.1),
@@ -283,7 +351,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           _DeviceStatsTable(devices: _deviceStats),
         ],
       ),
-  
     );
   }
 }
@@ -307,15 +374,12 @@ class _TimeRangeButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? AppTheme.primary : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected
-                ? AppTheme.primary
-                : AppTheme.border,
+            color: isSelected ? AppTheme.primary : AppTheme.border,
           ),
         ),
         child: Text(
@@ -392,8 +456,7 @@ class _StatCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -572,8 +635,7 @@ class _TrendChart extends StatelessWidget {
               color: lineColor,
               barWidth: 2.5,
               dotData: const FlDotData(show: false),
-              belowBarData:
-                  BarAreaData(show: true, color: fillColor),
+              belowBarData: BarAreaData(show: true, color: fillColor),
             ),
           ],
         ),
@@ -614,8 +676,7 @@ class _DeviceStatsTable extends StatelessWidget {
         children: [
           // Header
           TableRow(
-            decoration:
-                const BoxDecoration(color: AppTheme.primarySurface),
+            decoration: const BoxDecoration(color: AppTheme.primarySurface),
             children: ['Eszköz', 'Be/ki kapcsolások', 'Üzemidő (h)']
                 .map(
                   (h) => Padding(
@@ -639,8 +700,8 @@ class _DeviceStatsTable extends StatelessWidget {
                 (e) => TableRow(
                   decoration: BoxDecoration(
                     color: e.key.isOdd ? Colors.white : Color(0xFFFAFAFA),
-                    border: const Border(
-                        top: BorderSide(color: AppTheme.border)),
+                    border:
+                        const Border(top: BorderSide(color: AppTheme.border)),
                   ),
                   children: [
                     // Device name
@@ -649,8 +710,7 @@ class _DeviceStatsTable extends StatelessWidget {
                           horizontal: 16, vertical: 14),
                       child: Row(
                         children: [
-                          Icon(e.value.icon,
-                              size: 16, color: AppTheme.primary),
+                          Icon(e.value.icon, size: 16, color: AppTheme.primary),
                           const SizedBox(width: 8),
                           Text(
                             e.value.name,

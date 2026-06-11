@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class Esp32Screen extends StatefulWidget {
   const Esp32Screen({super.key});
@@ -21,6 +22,50 @@ class _Esp32ScreenState extends State<Esp32Screen> {
   int _uptimeHours = 5;
   int _uptimeMinutes = 23;
 
+  bool _isLoading = true;
+  String? _error;
+  String _ipAddress = '-';
+  String _firmwareVersion = '-';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEsp32Status();
+  }
+
+  Future<void> _loadEsp32Status() async {
+    try {
+      final status = await ApiService.getEsp32Status();
+
+      final uptimeSeconds = status['uptimeSeconds'] ?? 0;
+      final days = uptimeSeconds ~/ 86400;
+      final hours = (uptimeSeconds % 86400) ~/ 3600;
+      final minutes = (uptimeSeconds % 3600) ~/ 60;
+
+      setState(() {
+        _isOnline = status['isOnline'] ?? false;
+        _wifiConnected = status['wifiConnected'] ?? false;
+        _mqttConnected = status['mqttConnected'] ?? false;
+        _signalStrength = status['signalStrength'] ?? 0;
+        _freeRAM = status['freeRam'] ?? 0;
+        _totalRAM = status['totalRam'] ?? 320;
+        _cpuTemp = status['cpuTemp'] ?? 0;
+        _uptimeDays = days;
+        _uptimeHours = hours;
+        _uptimeMinutes = minutes;
+        _ipAddress = status['ipAddress'] ?? '-';
+        _firmwareVersion = status['firmwareVersion'] ?? '-';
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Nem sikerült betölteni az ESP32 státuszt: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
   final List<String> _debugLogs = [
     '[14:32:15] System started - v1.3.2',
     '[14:32:16] Initializing DHT22 sensor...',
@@ -41,14 +86,46 @@ class _Esp32ScreenState extends State<Esp32Screen> {
   ];
 
   final List<_PinInfo> _pins = [
-    _PinInfo(name: 'DHT22 (Data)', gpio: 4, status: 'Aktív', color: AppTheme.primary),
-    _PinInfo(name: 'Talajnedvesség', gpio: 34, status: 'Aktív', color: AppTheme.primary),
-    _PinInfo(name: 'BH1750 (SDA)', gpio: 21, status: 'Aktív', color: AppTheme.primary),
-    _PinInfo(name: 'BH1750 (SCL)', gpio: 22, status: 'Aktív', color: AppTheme.primary),
-    _PinInfo(name: 'Relé — Szellőzés', gpio: 26, status: 'Kikapcsolt', color: const Color(0xFF9CA3AF)),
-    _PinInfo(name: 'Relé — Öntözés', gpio: 27, status: 'Kikapcsolt', color: const Color(0xFF9CA3AF)),
-    _PinInfo(name: 'Relé — Lámpa', gpio: 14, status: 'Bekapcsolt', color: AppTheme.primary),
-    _PinInfo(name: 'Relé — Fűtés', gpio: 12, status: 'Kikapcsolt', color: const Color(0xFF9CA3AF)),
+    _PinInfo(
+        name: 'DHT22 (Data)',
+        gpio: 4,
+        status: 'Aktív',
+        color: AppTheme.primary),
+    _PinInfo(
+        name: 'Talajnedvesség',
+        gpio: 34,
+        status: 'Aktív',
+        color: AppTheme.primary),
+    _PinInfo(
+        name: 'BH1750 (SDA)',
+        gpio: 21,
+        status: 'Aktív',
+        color: AppTheme.primary),
+    _PinInfo(
+        name: 'BH1750 (SCL)',
+        gpio: 22,
+        status: 'Aktív',
+        color: AppTheme.primary),
+    _PinInfo(
+        name: 'Relé — Szellőzés',
+        gpio: 26,
+        status: 'Kikapcsolt',
+        color: const Color(0xFF9CA3AF)),
+    _PinInfo(
+        name: 'Relé — Öntözés',
+        gpio: 27,
+        status: 'Kikapcsolt',
+        color: const Color(0xFF9CA3AF)),
+    _PinInfo(
+        name: 'Relé — Lámpa',
+        gpio: 14,
+        status: 'Bekapcsolt',
+        color: AppTheme.primary),
+    _PinInfo(
+        name: 'Relé — Fűtés',
+        gpio: 12,
+        status: 'Kikapcsolt',
+        color: const Color(0xFF9CA3AF)),
   ];
 
   void _reboot() {
@@ -114,7 +191,8 @@ class _Esp32ScreenState extends State<Esp32Screen> {
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
         content: const Text(
           '⚠️ Ez MINDEN beállítást töröl! Az összes konfigurációt újra kell végezni.',
-          style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600),
+          style:
+              TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w600),
         ),
         actions: [
           TextButton(
@@ -148,13 +226,22 @@ class _Esp32ScreenState extends State<Esp32Screen> {
   String get _uptimeLabel =>
       '${_uptimeDays}d ${_uptimeHours}h ${_uptimeMinutes}m';
 
-  double get _ramUsagePercent => (_freeRAM / _totalRAM) * 100;
+  double get _ramUsagePercent {
+    if (_totalRAM == 0) return 0;
+    return ((_totalRAM - _freeRAM) / _totalRAM).clamp(0, 1);
+  }
 
-@override
-Widget build(BuildContext context) {
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-return SingleChildScrollView(
-  child: Column(
+    if (_error != null) {
+      return Center(child: Text(_error!));
+    }
+    return SingleChildScrollView(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
@@ -193,14 +280,11 @@ return SingleChildScrollView(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: _isOnline
-                  ? AppTheme.primaryLight
-                  : const Color(0xFFFEF2F2),
+              color:
+                  _isOnline ? AppTheme.primaryLight : const Color(0xFFFEF2F2),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: _isOnline
-                    ? AppTheme.primary
-                    : const Color(0xFFEF4444),
+                color: _isOnline ? AppTheme.primary : const Color(0xFFEF4444),
               ),
             ),
             child: Column(
@@ -301,7 +385,7 @@ return SingleChildScrollView(
                 label: 'RAM használat',
                 value: '$_freeRAM KB',
                 subtitle: 'Szabad / $_totalRAM KB',
-                progress: _ramUsagePercent / 100,
+                progress: _ramUsagePercent,
                 color: AppTheme.primary,
               ),
               _TelemetryCard(
@@ -310,9 +394,8 @@ return SingleChildScrollView(
                 value: '$_cpuTemp°C',
                 subtitle: 'Normál',
                 progress: _cpuTemp / 100,
-                color: _cpuTemp > 70
-                    ? const Color(0xFFEF4444)
-                    : AppTheme.primary,
+                color:
+                    _cpuTemp > 70 ? const Color(0xFFEF4444) : AppTheme.primary,
               ),
               _TelemetryCard(
                 icon: Icons.schedule_rounded,
@@ -323,18 +406,51 @@ return SingleChildScrollView(
                 color: AppTheme.primary,
               ),
               _TelemetryCard(
-                icon: Icons.speed_rounded,
-                label: 'CPU kihasználás',
-                value: '34%',
-                subtitle: 'Átlagos terhelés',
-                progress: 0.34,
+                icon: Icons.info_outline_rounded,
+                label: 'IP cím',
+                value: _ipAddress,
+                subtitle: 'ESP32 hálózati cím',
+                progress: null,
                 color: const Color(0xFF8B5CF6),
               ),
             ],
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Firmware verzió',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  _firmwareVersion,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+          ),
 
+          const SizedBox(height: 24),
+          
           // Pin status
           const Text(
             'Pin kiosztás és előkapcsolások',
@@ -475,8 +591,8 @@ return SingleChildScrollView(
             decoration: BoxDecoration(
               color: const Color(0xFF0F172A),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: AppTheme.textSecondary.withOpacity(0.2)),
+              border:
+                  Border.all(color: AppTheme.textSecondary.withOpacity(0.2)),
             ),
             constraints: const BoxConstraints(maxHeight: 300),
             child: SingleChildScrollView(
@@ -504,10 +620,8 @@ return SingleChildScrollView(
                   label: const Text('Újraindítás'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFF59E0B),
-                    side: const BorderSide(
-                        color: Color(0xFFF59E0B)),
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 12),
+                    side: const BorderSide(color: Color(0xFFF59E0B)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
@@ -521,10 +635,8 @@ return SingleChildScrollView(
                   label: const Text('Visszaállítás'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFFEF4444),
-                    side: const BorderSide(
-                        color: Color(0xFFEF4444)),
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 12),
+                    side: const BorderSide(color: Color(0xFFEF4444)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
@@ -535,9 +647,8 @@ return SingleChildScrollView(
 
           const SizedBox(height: 28),
         ],
-     ),
-
-);
+      ),
+    );
   }
 }
 
@@ -705,8 +816,7 @@ class _TelemetryCard extends StatelessWidget {
                 value: progress,
                 minHeight: 4,
                 backgroundColor: AppTheme.border,
-                valueColor:
-                    AlwaysStoppedAnimation<Color>(color),
+                valueColor: AlwaysStoppedAnimation<Color>(color),
               ),
             ),
           ],

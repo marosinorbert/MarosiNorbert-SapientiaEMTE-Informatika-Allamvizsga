@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -13,26 +14,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _wifiPasswordCtrl;
   late TextEditingController _mqttBrokerCtrl;
   late TextEditingController _mqttPortCtrl;
-  // Automation thresholds
-double _tempMin = 18;
-double _tempMax = 28;
 
-double _humidityMin = 50;
-double _humidityMax = 75;
+  bool _isLoading = true;
+  String? _error;
 
-double _soilMin = 35;
-double _soilMax = 80;
-
-double _lightMin = 800;
-double _lightMax = 3000;
+  double _tempMin = 18;
+  double _tempMax = 28;
+  double _humidityMin = 50;
+  double _humidityMax = 75;
+  double _soilMin = 35;
+  double _soilMax = 80;
+  double _lightMin = 800;
+  double _lightMax = 3000;
 
   @override
   void initState() {
     super.initState();
+
     _wifiSSIDCtrl = TextEditingController(text: _wifiSSID);
     _wifiPasswordCtrl = TextEditingController(text: _wifiPassword);
     _mqttBrokerCtrl = TextEditingController(text: _mqttBroker);
     _mqttPortCtrl = TextEditingController(text: _mqttPort.toString());
+
+    _loadSettings();
   }
 
   @override
@@ -43,7 +47,7 @@ double _lightMax = 3000;
     _mqttPortCtrl.dispose();
     super.dispose();
   }
-  
+
   // General settings
   bool _darkMode = false;
   String _language = 'hu';
@@ -75,14 +79,73 @@ double _lightMax = 3000;
   final String _ipAddress = '192.168.1.100';
   final int _uptimeHours = 247;
 
-  void _saveSettings() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('✓ Beállítások mentve!'),
-        backgroundColor: AppTheme.primary,
-        duration: Duration(seconds: 2),
-      ),
-    );
+  double _toDouble(dynamic value, double fallback) {
+    if (value == null) return fallback;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final settings = await ApiService.getSettings();
+
+      setState(() {
+        _tempMin = _toDouble(settings['temp_min'], 18);
+        _tempMax = _toDouble(settings['temp_max'], 28);
+
+        _humidityMin = _toDouble(settings['humidity_min'], 50);
+        _humidityMax = _toDouble(settings['humidity_max'], 75);
+
+        _soilMin = _toDouble(settings['soil_min'], 35);
+        _soilMax = _toDouble(settings['soil_max'], 80);
+
+        _lightMin = _toDouble(settings['light_min'], 800);
+        _lightMax = _toDouble(settings['light_max'], 3000);
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Nem sikerült betölteni a beállításokat: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    try {
+      await ApiService.updateSettings(
+        tempMin: _tempMin,
+        tempMax: _tempMax,
+        humidityMin: _humidityMin,
+        humidityMax: _humidityMax,
+        soilMin: _soilMin,
+        soilMax: _soilMax,
+        lightMin: _lightMin,
+        lightMax: _lightMax,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✓ Beállítások mentve az adatbázisba!'),
+          backgroundColor: AppTheme.primary,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Hiba mentés közben: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   void _changePassword() {
@@ -131,7 +194,7 @@ double _lightMax = 3000;
                   controller: newCtrl,
                   hint: 'Új jelszó',
                   obscure: !showNew,
-                  ),
+                ),
                 const SizedBox(height: 14),
                 const Text('Jelszó megerősítése',
                     style: TextStyle(
@@ -143,7 +206,7 @@ double _lightMax = 3000;
                   controller: confirmCtrl,
                   hint: 'Jelszó megerősítése',
                   obscure: !showConfirm,
-                  ),
+                ),
               ],
             ),
           ),
@@ -177,12 +240,11 @@ double _lightMax = 3000;
   }
 
   void _changePIN() {
-final pinCtrl = TextEditingController(text: _pinCode);
+    final pinCtrl = TextEditingController(text: _pinCode);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'PIN kód módosítása',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -207,13 +269,12 @@ final pinCtrl = TextEditingController(text: _pinCode);
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 24, letterSpacing: 8),
                 decoration: InputDecoration(
-                  border:
-                      OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(
-                        color: AppTheme.primary, width: 2),
+                    borderSide:
+                        const BorderSide(color: AppTheme.primary, width: 2),
                   ),
                 ),
               ),
@@ -247,12 +308,18 @@ final pinCtrl = TextEditingController(text: _pinCode);
     );
   }
 
-@override
-Widget build(BuildContext context) {
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-  
-  return SingleChildScrollView(
-    child: Column(
+    if (_error != null) {
+      return Center(child: Text(_error!));
+    }
+
+    return SingleChildScrollView(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
@@ -301,8 +368,7 @@ Widget build(BuildContext context) {
                     const SizedBox(width: 8),
                     Switch(
                       value: _darkMode,
-                      onChanged: (v) =>
-                          setState(() => _darkMode = v),
+                      onChanged: (v) => setState(() => _darkMode = v),
                       activeColor: AppTheme.primary,
                     ),
                     const SizedBox(width: 8),
@@ -319,8 +385,7 @@ Widget build(BuildContext context) {
                     DropdownMenuItem(value: 'hu', child: Text('Magyar')),
                     DropdownMenuItem(value: 'en', child: Text('English')),
                   ],
-                  onChanged: (v) =>
-                      setState(() => _language = v ?? 'hu'),
+                  onChanged: (v) => setState(() => _language = v ?? 'hu'),
                   underline: const SizedBox(),
                 ),
               ),
@@ -332,8 +397,7 @@ Widget build(BuildContext context) {
                     DropdownMenuItem(value: '°C', child: Text('°C')),
                     DropdownMenuItem(value: '°F', child: Text('°F')),
                   ],
-                  onChanged: (v) =>
-                      setState(() => _tempUnit = v ?? '°C'),
+                  onChanged: (v) => setState(() => _tempUnit = v ?? '°C'),
                   underline: const SizedBox(),
                 ),
               ),
@@ -349,35 +413,35 @@ Widget build(BuildContext context) {
             children: [
               _SettingLabel('WiFi'),
               _SettingsTextField(
-  label: 'SSID',
-  hint: 'WiFi hálózat neve',  // ← ADD THIS
-  controller: _wifiSSIDCtrl,
-  onChanged: (v) => _wifiSSID = v,
-),
-const SizedBox(height: 8),
-_SettingsTextField(
-  label: 'Jelszó',
-  hint: 'WiFi jelszó',  // ← ADD THIS
-  controller: _wifiPasswordCtrl,
-  onChanged: (v) => _wifiPassword = v,
-  obscure: true,
-),
-const SizedBox(height: 16),
-_SettingLabel('MQTT'),
-_SettingsTextField(
-  label: 'Broker cím',
-  hint: 'mqtt.example.com',  // ← ADD THIS
-  controller: _mqttBrokerCtrl,
-  onChanged: (v) => _mqttBroker = v,
-),
-const SizedBox(height: 8),
-_SettingsTextField(
-  label: 'Port',
-  hint: '1883',  // ← ADD THIS
-  controller: _mqttPortCtrl,
-  onChanged: (v) => _mqttPort = int.tryParse(v) ?? 1883,
-  keyboardType: TextInputType.number,
-),
+                label: 'SSID',
+                hint: 'WiFi hálózat neve', // ← ADD THIS
+                controller: _wifiSSIDCtrl,
+                onChanged: (v) => _wifiSSID = v,
+              ),
+              const SizedBox(height: 8),
+              _SettingsTextField(
+                label: 'Jelszó',
+                hint: 'WiFi jelszó', // ← ADD THIS
+                controller: _wifiPasswordCtrl,
+                onChanged: (v) => _wifiPassword = v,
+                obscure: true,
+              ),
+              const SizedBox(height: 16),
+              _SettingLabel('MQTT'),
+              _SettingsTextField(
+                label: 'Broker cím',
+                hint: 'mqtt.example.com', // ← ADD THIS
+                controller: _mqttBrokerCtrl,
+                onChanged: (v) => _mqttBroker = v,
+              ),
+              const SizedBox(height: 8),
+              _SettingsTextField(
+                label: 'Port',
+                hint: '1883', // ← ADD THIS
+                controller: _mqttPortCtrl,
+                onChanged: (v) => _mqttPort = int.tryParse(v) ?? 1883,
+                keyboardType: TextInputType.number,
+              ),
             ],
           ),
 
@@ -395,8 +459,7 @@ _SettingsTextField(
                     child: _NumberInput(
                       label: 'Offset',
                       value: _tempOffset,
-                      onChanged: (v) =>
-                          setState(() => _tempOffset = v),
+                      onChanged: (v) => setState(() => _tempOffset = v),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -404,8 +467,7 @@ _SettingsTextField(
                     child: _NumberInput(
                       label: 'Scale',
                       value: _tempScale,
-                      onChanged: (v) =>
-                          setState(() => _tempScale = v),
+                      onChanged: (v) => setState(() => _tempScale = v),
                       step: 0.1,
                     ),
                   ),
@@ -419,8 +481,7 @@ _SettingsTextField(
                     child: _NumberInput(
                       label: 'Offset',
                       value: _humidityOffset,
-                      onChanged: (v) =>
-                          setState(() => _humidityOffset = v),
+                      onChanged: (v) => setState(() => _humidityOffset = v),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -428,8 +489,7 @@ _SettingsTextField(
                     child: _NumberInput(
                       label: 'Scale',
                       value: _humidityScale,
-                      onChanged: (v) =>
-                          setState(() => _humidityScale = v),
+                      onChanged: (v) => setState(() => _humidityScale = v),
                       step: 0.1,
                     ),
                   ),
@@ -443,8 +503,7 @@ _SettingsTextField(
                     child: _NumberInput(
                       label: 'Offset',
                       value: _soilOffset,
-                      onChanged: (v) =>
-                          setState(() => _soilOffset = v),
+                      onChanged: (v) => setState(() => _soilOffset = v),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -452,8 +511,7 @@ _SettingsTextField(
                     child: _NumberInput(
                       label: 'Scale',
                       value: _soilScale,
-                      onChanged: (v) =>
-                          setState(() => _soilScale = v),
+                      onChanged: (v) => setState(() => _soilScale = v),
                       step: 0.1,
                     ),
                   ),
@@ -462,103 +520,97 @@ _SettingsTextField(
             ],
           ),
           // Automation settings
-_SettingsSection(
-  title: 'Automatikus vezérlés',
-  icon: Icons.auto_mode_rounded,
-  children: [
-    _SettingLabel('Hőmérséklet (°C)'),
-    Row(
-      children: [
-        Expanded(
-          child: _NumberInput(
-            label: 'Minimum',
-            value: _tempMin,
-            onChanged: (v) => setState(() => _tempMin = v),
+          _SettingsSection(
+            title: 'Automatikus vezérlés',
+            icon: Icons.auto_mode_rounded,
+            children: [
+              _SettingLabel('Hőmérséklet (°C)'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _NumberInput(
+                      label: 'Minimum',
+                      value: _tempMin,
+                      onChanged: (v) => setState(() => _tempMin = v),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _NumberInput(
+                      label: 'Maximum',
+                      value: _tempMax,
+                      onChanged: (v) => setState(() => _tempMax = v),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _SettingLabel('Páratartalom (%)'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _NumberInput(
+                      label: 'Minimum',
+                      value: _humidityMin,
+                      onChanged: (v) => setState(() => _humidityMin = v),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _NumberInput(
+                      label: 'Maximum',
+                      value: _humidityMax,
+                      onChanged: (v) => setState(() => _humidityMax = v),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _SettingLabel('Talajnedvesség (%)'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _NumberInput(
+                      label: 'Minimum',
+                      value: _soilMin,
+                      onChanged: (v) => setState(() => _soilMin = v),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _NumberInput(
+                      label: 'Maximum',
+                      value: _soilMax,
+                      onChanged: (v) => setState(() => _soilMax = v),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _SettingLabel('Fényerősség (lux)'),
+              Row(
+                children: [
+                  Expanded(
+                    child: _NumberInput(
+                      label: 'Minimum',
+                      value: _lightMin,
+                      onChanged: (v) => setState(() => _lightMin = v),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _NumberInput(
+                      label: 'Maximum',
+                      value: _lightMax,
+                      onChanged: (v) => setState(() => _lightMax = v),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _NumberInput(
-            label: 'Maximum',
-            value: _tempMax,
-            onChanged: (v) => setState(() => _tempMax = v),
-          ),
-        ),
-      ],
-    ),
 
-    const SizedBox(height: 12),
-
-    _SettingLabel('Páratartalom (%)'),
-    Row(
-      children: [
-        Expanded(
-          child: _NumberInput(
-            label: 'Minimum',
-            value: _humidityMin,
-            onChanged: (v) => setState(() => _humidityMin = v),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _NumberInput(
-            label: 'Maximum',
-            value: _humidityMax,
-            onChanged: (v) => setState(() => _humidityMax = v),
-          ),
-        ),
-      ],
-    ),
-
-    const SizedBox(height: 12),
-
-    _SettingLabel('Talajnedvesség (%)'),
-Row(
-  children: [
-    Expanded(
-      child: _NumberInput(
-        label: 'Minimum',
-        value: _soilMin,
-        onChanged: (v) => setState(() => _soilMin = v),
-      ),
-    ),
-    const SizedBox(width: 12),
-    Expanded(
-      child: _NumberInput(
-        label: 'Maximum',
-        value: _soilMax,
-        onChanged: (v) => setState(() => _soilMax = v),
-      ),
-    ),
-  ],
-),
-
-    const SizedBox(height: 12),
-
-    _SettingLabel('Fényerősség (lux)'),
-    Row(
-      children: [
-        Expanded(
-          child: _NumberInput(
-            label: 'Minimum',
-            value: _lightMin,
-            onChanged: (v) => setState(() => _lightMin = v),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _NumberInput(
-            label: 'Maximum',
-            value: _lightMax,
-            onChanged: (v) => setState(() => _lightMax = v),
-          ),
-        ),
-      ],
-    ),
-  ],
-),
-
-const SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           const SizedBox(height: 16),
 
@@ -610,8 +662,7 @@ const SizedBox(height: 16),
                       onPressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content:
-                                Text('✓ Adatok importálva sikeresen!'),
+                            content: Text('✓ Adatok importálva sikeresen!'),
                             duration: Duration(seconds: 2),
                           ),
                         );
@@ -663,8 +714,7 @@ const SizedBox(height: 16),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
@@ -674,7 +724,6 @@ const SizedBox(height: 16),
           const SizedBox(height: 28),
         ],
       ),
-  
     );
   }
 }
@@ -714,8 +763,7 @@ class _SettingsSection extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
               color: AppTheme.primarySurface,
-              borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(16)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Row(
               children: [
@@ -866,16 +914,13 @@ class _SettingsTextFieldState extends State<_SettingsTextField> {
           keyboardType: widget.keyboardType,
           decoration: InputDecoration(
             hintText: widget.hint,
-            hintStyle:
-                const TextStyle(color: AppTheme.textSecondary),
-            contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 10),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10)),
+            hintStyle: const TextStyle(color: AppTheme.textSecondary),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(
-                  color: AppTheme.primary, width: 2),
+              borderSide: const BorderSide(color: AppTheme.primary, width: 2),
             ),
             suffixIcon: widget.obscure
                 ? IconButton(
@@ -928,25 +973,21 @@ class _NumberInput extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             border: Border.all(color: AppTheme.border),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               GestureDetector(
-                onTap: () =>
-                    onChanged(value - step),
+                onTap: () => onChanged(value - step),
                 child: const Icon(Icons.remove_rounded,
                     size: 16, color: AppTheme.primary),
               ),
               Text(
-                value.toStringAsFixed(
-                    step < 1 ? 1 : 0),
+                value.toStringAsFixed(step < 1 ? 1 : 0),
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -954,8 +995,7 @@ class _NumberInput extends StatelessWidget {
                 ),
               ),
               GestureDetector(
-                onTap: () =>
-                    onChanged(value + step),
+                onTap: () => onChanged(value + step),
                 child: const Icon(Icons.add_rounded,
                     size: 16, color: AppTheme.primary),
               ),

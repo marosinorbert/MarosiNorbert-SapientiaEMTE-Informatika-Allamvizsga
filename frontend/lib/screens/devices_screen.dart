@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
+import 'dart:async';
 
 class DevicesScreen extends StatefulWidget {
   const DevicesScreen({super.key});
@@ -9,13 +11,16 @@ class DevicesScreen extends StatefulWidget {
 }
 
 class _DevicesScreenState extends State<DevicesScreen> {
+  Timer? _refreshTimer;
   final List<_Device> _devices = [
     _Device(
       name: 'Szellőzés',
       description: 'Levegő keringtetés és klíma szabályozás',
       icon: Icons.air_rounded,
+      deviceKey: 'fan',
       isOn: true,
       isAuto: true,
+      scheduleEnabled: true,
       uptimeHours: 14,
       scheduleOn: const TimeOfDay(hour: 7, minute: 0),
       scheduleOff: const TimeOfDay(hour: 21, minute: 0),
@@ -25,8 +30,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
       name: 'Öntözőrendszer',
       description: 'Automatikus öntözés',
       icon: Icons.water_drop_rounded,
+      deviceKey: 'pump',
       isOn: false,
       isAuto: false,
+      scheduleEnabled: false,
       uptimeHours: 3,
       scheduleOn: const TimeOfDay(hour: 8, minute: 0),
       scheduleOff: const TimeOfDay(hour: 8, minute: 30),
@@ -36,8 +43,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
       name: 'Növénylámpa',
       description: 'Kiegészítő világítás',
       icon: Icons.light_mode_rounded,
+      deviceKey: 'light',
       isOn: true,
       isAuto: true,
+      scheduleEnabled: true,
       uptimeHours: 8,
       scheduleOn: const TimeOfDay(hour: 6, minute: 0),
       scheduleOff: const TimeOfDay(hour: 20, minute: 0),
@@ -47,8 +56,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
       name: 'Fűtés',
       description: 'Hőmérséklet szabályozás',
       icon: Icons.local_fire_department_rounded,
+      deviceKey: 'heater',
       isOn: false,
       isAuto: true,
+      scheduleEnabled: true,
       uptimeHours: 0,
       scheduleOn: const TimeOfDay(hour: 5, minute: 0),
       scheduleOff: const TimeOfDay(hour: 9, minute: 0),
@@ -56,8 +67,19 @@ class _DevicesScreenState extends State<DevicesScreen> {
     ),
   ];
 
+  bool _isLoading = true;
+  String? _error;
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(child: Text(_error!));
+    }
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,14 +150,16 @@ class _DevicesScreenState extends State<DevicesScreen> {
               padding: const EdgeInsets.only(bottom: 16),
               child: _DeviceCard(
                 device: _devices[i],
-                onToggleMode: () => setState(
-                    () => _devices[i].isAuto = !_devices[i].isAuto),
-                onToggleOnOff: () =>
-                    setState(() => _devices[i].isOn = !_devices[i].isOn),
-                onScheduleOnChanged: (t) =>
-                    setState(() => _devices[i].scheduleOn = t),
-                onScheduleOffChanged: (t) =>
-                    setState(() => _devices[i].scheduleOff = t),
+                onToggleMode: () => _toggleDeviceMode(i),
+                onToggleOnOff: () => _toggleDevice(i),
+                onScheduleOnChanged: (t) async {
+                  setState(() => _devices[i].scheduleOn = t);
+                  await _saveSchedule(_devices[i]);
+                },
+                onScheduleOffChanged: (t) async {
+                  setState(() => _devices[i].scheduleOff = t);
+                  await _saveSchedule(_devices[i]);
+                },
               ),
             ),
           ),
@@ -145,14 +169,210 @@ class _DevicesScreenState extends State<DevicesScreen> {
       ),
     );
   }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDevices();
+
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _loadDevices(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  TimeOfDay _parseTime(dynamic value) {
+    if (value == null) {
+      return const TimeOfDay(hour: 8, minute: 0);
+    }
+
+    final parts = value.toString().split(':');
+
+    return TimeOfDay(
+      hour: int.tryParse(parts[0]) ?? 8,
+      minute: int.tryParse(parts[1]) ?? 0,
+    );
+  }
+
+  Future<void> _loadDevices() async {
+    try {
+      final devicesJson = await ApiService.getDevices();
+
+      setState(() {
+        for (final deviceJson in devicesJson) {
+          final deviceName = deviceJson['device_name'];
+          final isOn = deviceJson['is_on'] ?? false;
+          final isAuto = deviceJson['is_auto'] ?? false;
+          final scheduleEnabled = deviceJson['schedule_enabled'] ?? false;
+          final scheduleOn = _parseTime(deviceJson['schedule_on']);
+          final scheduleOff = _parseTime(deviceJson['schedule_off']);
+
+          if (deviceName == 'pump') {
+            final device =
+                _devices.firstWhere((d) => d.name == 'Öntözőrendszer');
+            device.isOn = isOn;
+            device.isAuto = isAuto;
+            device.scheduleEnabled = scheduleEnabled;
+            device.scheduleOn = scheduleOn;
+            device.scheduleOff = scheduleOff;
+          }
+
+          if (deviceName == 'light') {
+            final device = _devices.firstWhere((d) => d.name == 'Növénylámpa');
+            device.isOn = isOn;
+            device.isAuto = isAuto;
+            device.scheduleEnabled = scheduleEnabled;
+            device.scheduleOn = scheduleOn;
+            device.scheduleOff = scheduleOff;
+          }
+
+          if (deviceName == 'fan') {
+            final device = _devices.firstWhere((d) => d.name == 'Szellőzés');
+            device.isOn = isOn;
+            device.isAuto = isAuto;
+            device.scheduleEnabled = scheduleEnabled;
+            device.scheduleOn = scheduleOn;
+            device.scheduleOff = scheduleOff;
+          }
+
+          if (deviceName == 'heater') {
+            final device = _devices.firstWhere((d) => d.name == 'Fűtés');
+            device.isOn = isOn;
+            device.isAuto = isAuto;
+            device.scheduleEnabled = scheduleEnabled;
+            device.scheduleOn = scheduleOn;
+            device.scheduleOff = scheduleOff;
+          }
+        }
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Nem sikerült betölteni az eszközöket: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _toggleDevice(int index) async {
+    final device = _devices[index];
+
+    String apiDeviceName;
+
+    switch (device.name) {
+      case 'Öntözőrendszer':
+        apiDeviceName = 'pump';
+        break;
+      case 'Növénylámpa':
+        apiDeviceName = 'light';
+        break;
+      case 'Szellőzés':
+        apiDeviceName = 'fan';
+        break;
+      case 'Fűtés':
+        apiDeviceName = 'heater';
+        break;
+      default:
+        return;
+    }
+
+    final newValue = !device.isOn;
+
+    setState(() {
+      _devices[index].isOn = newValue;
+    });
+
+    try {
+      await ApiService.toggleDevice(apiDeviceName, newValue);
+    } catch (e) {
+      setState(() {
+        _devices[index].isOn = !newValue;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Nem sikerült kapcsolni: $e'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _toggleDeviceMode(int index) async {
+    final device = _devices[index];
+
+    String apiDeviceName;
+
+    switch (device.name) {
+      case 'Öntözőrendszer':
+        apiDeviceName = 'pump';
+        break;
+      case 'Növénylámpa':
+        apiDeviceName = 'light';
+        break;
+      case 'Szellőzés':
+        apiDeviceName = 'fan';
+        break;
+      case 'Fűtés':
+        apiDeviceName = 'heater';
+        break;
+      default:
+        return;
+    }
+
+    final newValue = !device.isAuto;
+
+    setState(() {
+      _devices[index].isAuto = newValue;
+    });
+
+    try {
+      await ApiService.toggleDeviceMode(apiDeviceName, newValue);
+    } catch (e) {
+      setState(() {
+        _devices[index].isAuto = !newValue;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Nem sikerült módosítani az automata módot: $e'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _saveSchedule(_Device device) async {
+    try {
+      await ApiService.updateDeviceSchedule(
+        device: device.deviceKey,
+        scheduleEnabled: device.scheduleEnabled,
+        scheduleOn:
+            '${device.scheduleOn.hour.toString().padLeft(2, '0')}:${device.scheduleOn.minute.toString().padLeft(2, '0')}',
+        scheduleOff:
+            '${device.scheduleOff.hour.toString().padLeft(2, '0')}:${device.scheduleOff.minute.toString().padLeft(2, '0')}',
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nem sikerült menteni az ütemezést: $e')),
+      );
+    }
+  }
 }
 
 class _Device {
   final String name;
   final String description;
   final IconData icon;
+  String deviceKey;
   bool isOn;
   bool isAuto;
+  bool scheduleEnabled;
   final int uptimeHours;
   TimeOfDay scheduleOn;
   TimeOfDay scheduleOff;
@@ -162,8 +382,10 @@ class _Device {
     required this.name,
     required this.description,
     required this.icon,
+    required this.deviceKey,
     required this.isOn,
     required this.isAuto,
+    required this.scheduleEnabled,
     required this.uptimeHours,
     required this.scheduleOn,
     required this.scheduleOff,
@@ -220,9 +442,8 @@ class _DeviceCard extends StatelessWidget {
                 ),
                 child: Icon(
                   device.icon,
-                  color: device.isOn
-                      ? AppTheme.primary
-                      : AppTheme.textSecondary,
+                  color:
+                      device.isOn ? AppTheme.primary : AppTheme.textSecondary,
                   size: 20,
                 ),
               ),
@@ -253,8 +474,7 @@ class _DeviceCard extends StatelessWidget {
               ),
               // Üzemóra badge
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF3F4F6),
                   borderRadius: BorderRadius.circular(16),
@@ -357,9 +577,8 @@ class _DeviceCard extends StatelessWidget {
                         height: 24,
                         child: Switch(
                           value: device.isOn,
-                          onChanged: device.isAuto
-                              ? null
-                              : (_) => onToggleOnOff(),
+                          onChanged:
+                              device.isAuto ? null : (_) => onToggleOnOff(),
                           activeColor: AppTheme.primary,
                           activeTrackColor: AppTheme.primaryLight,
                           materialTapTargetSize:
@@ -445,8 +664,7 @@ class _DeviceCard extends StatelessWidget {
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
                 color: AppTheme.primarySurface,
                 borderRadius: BorderRadius.circular(8),
@@ -540,8 +758,8 @@ class _TimeButton extends StatelessWidget {
           children: [
             Text(
               '$label: ',
-              style: const TextStyle(
-                  fontSize: 10, color: AppTheme.textSecondary),
+              style:
+                  const TextStyle(fontSize: 10, color: AppTheme.textSecondary),
             ),
             Text(
               time,

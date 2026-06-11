@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
+import 'dart:async';
 
 enum LogType { device, sensor, alert, system }
 
@@ -27,102 +29,31 @@ class LogScreen extends StatefulWidget {
 }
 
 class _LogScreenState extends State<LogScreen> {
+  Timer? _refreshTimer;
   final TextEditingController _searchController = TextEditingController();
   LogType? _selectedType;
   DateTime? _selectedDate;
   String _searchQuery = '';
 
-  final List<LogEntry> _allEntries = [
-    LogEntry(
-      id: 1,
-      type: LogType.system,
-      title: 'ESP32 kapcsolódott',
-      description: 'Az ESP32 modul sikeresen kapcsolódott a hálózathoz.',
-      timestamp: DateTime(2025, 6, 7, 14, 32),
-    ),
-    LogEntry(
-      id: 2,
-      type: LogType.device,
-      title: 'Szellőzés bekapcsolt',
-      description: 'A szellőzőrendszer automatikusan aktiválódott (hőmérséklet > 26°C).',
-      timestamp: DateTime(2025, 6, 7, 14, 15),
-    ),
-    LogEntry(
-      id: 3,
-      type: LogType.alert,
-      title: 'Riasztás: Alacsony talajnedvesség',
-      description: 'A talajnedvesség 38%-ra csökkent, riasztás kiadva.',
-      timestamp: DateTime(2025, 6, 7, 13, 15),
-    ),
-    LogEntry(
-      id: 4,
-      type: LogType.sensor,
-      title: 'Hőmérséklet ugrás',
-      description: 'Hőmérséklet: 22.1°C → 27.8°C (változás: +5.7°C).',
-      timestamp: DateTime(2025, 6, 7, 13, 0),
-    ),
-    LogEntry(
-      id: 5,
-      type: LogType.device,
-      title: 'Öntözőrendszer kikapcsolt',
-      description: 'Az öntözési ciklus befejeződött (30 perces ütemező).',
-      timestamp: DateTime(2025, 6, 7, 8, 30),
-    ),
-    LogEntry(
-      id: 6,
-      type: LogType.device,
-      title: 'Öntözőrendszer bekapcsolt',
-      description: 'Ütemezett öntözés indult (08:00 ütemező).',
-      timestamp: DateTime(2025, 6, 7, 8, 0),
-    ),
-    LogEntry(
-      id: 7,
-      type: LogType.device,
-      title: 'Növénylámpa bekapcsolt',
-      description: 'Ütemezett világítás indult (06:00 ütemező).',
-      timestamp: DateTime(2025, 6, 7, 6, 0),
-    ),
-    LogEntry(
-      id: 8,
-      type: LogType.system,
-      title: 'Rendszer újraindult',
-      description: 'ESP32 watchdog timer által kezdeményezett újraindítás.',
-      timestamp: DateTime(2025, 6, 7, 5, 47),
-    ),
-    LogEntry(
-      id: 9,
-      type: LogType.sensor,
-      title: 'Páratartalom normalizálódott',
-      description: 'Páratartalom visszatért a célértékre: 62% (volt: 48%).',
-      timestamp: DateTime(2025, 6, 6, 22, 10),
-    ),
-    LogEntry(
-      id: 10,
-      type: LogType.alert,
-      title: 'Riasztás nyugtázva',
-      description: 'A magas hőmérséklet riasztást a felhasználó nyugtázta.',
-      timestamp: DateTime(2025, 6, 6, 20, 5),
-    ),
-    LogEntry(
-      id: 11,
-      type: LogType.device,
-      title: 'Fűtés kikapcsolt',
-      description: 'A fűtés manuálisan kikapcsolva.',
-      timestamp: DateTime(2025, 6, 6, 18, 30),
-    ),
-    LogEntry(
-      id: 12,
-      type: LogType.system,
-      title: 'Firmware frissítés',
-      description: 'ESP32 firmware frissítve v1.2.3 → v1.3.0 verzióra.',
-      timestamp: DateTime(2025, 6, 6, 10, 0),
-    ),
-  ];
+  List<LogEntry> _allEntries = [];
+
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLogs();
+
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _loadLogs(),
+    );
+  }
 
   List<LogEntry> get _filtered {
     return _allEntries.where((e) {
-      final matchType =
-          _selectedType == null || e.type == _selectedType;
+      final matchType = _selectedType == null || e.type == _selectedType;
       final matchSearch = _searchQuery.isEmpty ||
           e.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           e.description.toLowerCase().contains(_searchQuery.toLowerCase());
@@ -146,19 +77,28 @@ class _LogScreenState extends State<LogScreen> {
 
   String _dateLabel(DateTime dt) {
     final now = DateTime.now();
-    if (dt.year == now.year &&
-        dt.month == now.month &&
-        dt.day == now.day) return 'Ma';
-    if (dt.year == now.year &&
-        dt.month == now.month &&
-        dt.day == now.day - 1) return 'Tegnap';
+    if (dt.year == now.year && dt.month == now.month && dt.day == now.day)
+      return 'Ma';
+    if (dt.year == now.year && dt.month == now.month && dt.day == now.day - 1)
+      return 'Tegnap';
     return '${dt.year}. ${_month(dt.month)} ${dt.day}.';
   }
 
   String _month(int m) {
     const months = [
-      '', 'jan.', 'feb.', 'már.', 'ápr.', 'máj.', 'jún.',
-      'júl.', 'aug.', 'szep.', 'okt.', 'nov.', 'dec.'
+      '',
+      'jan.',
+      'feb.',
+      'már.',
+      'ápr.',
+      'máj.',
+      'jún.',
+      'júl.',
+      'aug.',
+      'szep.',
+      'okt.',
+      'nov.',
+      'dec.'
     ];
     return months[m];
   }
@@ -204,18 +144,63 @@ class _LogScreenState extends State<LogScreen> {
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
+  Future<void> _loadLogs() async {
+    try {
+      final logs = await ApiService.getLogs();
+
+      setState(() {
+        _allEntries = logs.map<LogEntry>((log) {
+          return LogEntry(
+            id: log['id'],
+            type: _parseLogType(log['type']),
+            title: log['title'],
+            description: log['description'] ?? '',
+            timestamp: DateTime.parse(log['created_at']),
+          );
+        }).toList();
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Nem sikerült betölteni a naplót: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  LogType _parseLogType(String type) {
+    switch (type) {
+      case 'device':
+        return LogType.device;
+      case 'sensor':
+        return LogType.sensor;
+      case 'alert':
+        return LogType.alert;
+      default:
+        return LogType.system;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(child: Text(_error!));
+    }
     final grouped = _grouped;
     final dateKeys = grouped.keys.toList();
 
-
-return SingleChildScrollView(
-  child: Column(
+    return SingleChildScrollView(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
@@ -258,8 +243,7 @@ return SingleChildScrollView(
                   onChanged: (v) => setState(() => _searchQuery = v),
                   decoration: InputDecoration(
                     hintText: 'Keresés...',
-                    hintStyle:
-                        const TextStyle(color: AppTheme.textSecondary),
+                    hintStyle: const TextStyle(color: AppTheme.textSecondary),
                     prefixIcon: const Icon(Icons.search_rounded,
                         color: AppTheme.textSecondary, size: 20),
                     suffixIcon: _searchQuery.isNotEmpty
@@ -278,18 +262,16 @@ return SingleChildScrollView(
                         horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppTheme.border),
+                      borderSide: const BorderSide(color: AppTheme.border),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppTheme.border),
+                      borderSide: const BorderSide(color: AppTheme.border),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                          color: AppTheme.primary, width: 2),
+                      borderSide:
+                          const BorderSide(color: AppTheme.primary, width: 2),
                     ),
                   ),
                 ),
@@ -305,8 +287,8 @@ return SingleChildScrollView(
                     lastDate: DateTime.now(),
                     builder: (context, child) => Theme(
                       data: Theme.of(context).copyWith(
-                        colorScheme: const ColorScheme.light(
-                            primary: AppTheme.primary),
+                        colorScheme:
+                            const ColorScheme.light(primary: AppTheme.primary),
                       ),
                       child: child!,
                     ),
@@ -330,8 +312,8 @@ return SingleChildScrollView(
                         ? AppTheme.primary
                         : AppTheme.border,
                   ),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 13),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
@@ -369,8 +351,8 @@ return SingleChildScrollView(
                       label: _typeLabel(t),
                       isSelected: _selectedType == t,
                       color: _typeColor(t),
-                      onTap: () => setState(() => _selectedType =
-                          _selectedType == t ? null : t),
+                      onTap: () => setState(
+                          () => _selectedType = _selectedType == t ? null : t),
                     ),
                   ),
                 ),
@@ -383,8 +365,7 @@ return SingleChildScrollView(
           // Result count
           Text(
             '${_filtered.length} esemény',
-            style: const TextStyle(
-                fontSize: 12, color: AppTheme.textSecondary),
+            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
           ),
 
           const SizedBox(height: 20),
@@ -413,8 +394,7 @@ return SingleChildScrollView(
                           ),
                         ),
                         const SizedBox(width: 10),
-                        const Expanded(
-                            child: Divider(color: AppTheme.border)),
+                        const Expanded(child: Divider(color: AppTheme.border)),
                       ],
                     ),
                   ),
@@ -457,7 +437,6 @@ return SingleChildScrollView(
             }),
         ],
       ),
-
     );
   }
 }
@@ -607,8 +586,7 @@ class _FilterChip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: isSelected ? color.withOpacity(0.12) : Colors.white,
           borderRadius: BorderRadius.circular(20),
@@ -620,8 +598,7 @@ class _FilterChip extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 13,
-            fontWeight:
-                isSelected ? FontWeight.w700 : FontWeight.w400,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
             color: isSelected ? color : AppTheme.textSecondary,
           ),
         ),
@@ -659,8 +636,7 @@ class _EmptyLog extends StatelessWidget {
           SizedBox(height: 4),
           Text(
             'Próbálj más szűrési feltételt.',
-            style:
-                TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
           ),
         ],
       ),

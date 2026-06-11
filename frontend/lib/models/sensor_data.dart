@@ -27,12 +27,14 @@ class DeviceState {
   final String description;
   final String icon;
   bool isOn;
+  bool isAuto;
 
   DeviceState({
     required this.name,
     required this.description,
     required this.icon,
     required this.isOn,
+    required this.isAuto,
   });
 
   static List<DeviceState> get dummyDevices => [
@@ -41,24 +43,28 @@ class DeviceState {
           description: 'Levegő keringtetés és klíma szabályozás',
           icon: 'ventilation',
           isOn: true,
+          isAuto: true,
         ),
         DeviceState(
           name: 'Öntözőrendszer',
           description: 'Automatikus öntözés',
           icon: 'irrigation',
           isOn: true,
+          isAuto: true,
         ),
         DeviceState(
           name: 'Növénylámpa',
           description: 'Kiegészítő világítás',
           icon: 'lamp',
           isOn: true,
+          isAuto: true,
         ),
         DeviceState(
           name: 'Fűtés',
           description: 'Hőmérséklet szabályozás',
           icon: 'heating',
           isOn: false,
+          isAuto: true,
         ),
       ];
 }

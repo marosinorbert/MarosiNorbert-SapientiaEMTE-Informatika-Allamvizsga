@@ -7,6 +7,7 @@ import '../widgets/device_card.dart';
 import '../widgets/chart_card.dart';
 import '../utils/responsive.dart';
 import '../services/api_service.dart';
+import 'dart:async';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -25,16 +26,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<FlSpot> _tempSpots = [];
   List<FlSpot> _humiditySpots = [];
 
+  Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
     _loadSensorData();
+
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _loadSensorData(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadSensorData() async {
     try {
       final latestJson = await ApiService.getLatestSensorData();
-      final historyJson = await ApiService.getSensorHistory();
+      final historyJson = await ApiService.getSensorHistory(
+        hours: 24,
+      );
       final devicesJson = await ApiService.getDevices();
 
       final tempSpots = <FlSpot>[];
@@ -61,21 +77,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
       for (final deviceJson in devicesJson) {
         final deviceName = deviceJson['device_name'];
         final isOn = deviceJson['is_on'];
+        final isAuto = deviceJson['is_auto'];
 
         if (deviceName == 'pump') {
           _devices.firstWhere((d) => d.name == 'Öntözőrendszer').isOn = isOn;
+          _devices.firstWhere((d) => d.name == 'Öntözőrendszer').isAuto =
+              isAuto;
         }
 
         if (deviceName == 'light') {
           _devices.firstWhere((d) => d.name == 'Növénylámpa').isOn = isOn;
+          _devices.firstWhere((d) => d.name == 'Növénylámpa').isAuto = isAuto;
         }
 
         if (deviceName == 'fan') {
           _devices.firstWhere((d) => d.name == 'Szellőzés').isOn = isOn;
+          _devices.firstWhere((d) => d.name == 'Szellőzés').isAuto = isAuto;
         }
 
         if (deviceName == 'heater') {
           _devices.firstWhere((d) => d.name == 'Fűtés').isOn = isOn;
+          _devices.firstWhere((d) => d.name == 'Fűtés').isAuto = isAuto;
         }
       }
 

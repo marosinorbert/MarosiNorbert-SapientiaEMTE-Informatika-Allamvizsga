@@ -48,9 +48,8 @@ class DeviceCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: device.isOn
-                  ? AppTheme.primaryLight
-                  : const Color(0xFFF3F4F6),
+              color:
+                  device.isOn ? AppTheme.primaryLight : const Color(0xFFF3F4F6),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -65,9 +64,9 @@ class DeviceCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-  device.name,
-  maxLines: 1,
-  overflow: TextOverflow.ellipsis,
+                  device.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
@@ -75,37 +74,49 @@ class DeviceCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-  device.description,
-  maxLines: 1,
-  overflow: TextOverflow.ellipsis,
+                  device.description,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  device.isAuto ? 'Automata mód' : 'Manuális mód',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: device.isAuto
+                        ? AppTheme.primary
+                        : AppTheme.textSecondary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
           ),
           FittedBox(
-  child: Row(
-    children: [
-      Text(
-        device.isOn ? 'ON' : 'OFF',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: device.isOn ? AppTheme.primary : AppTheme.textSecondary,
+            child: Row(
+              children: [
+                Text(
+                  device.isOn ? 'ON' : 'OFF',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color:
+                        device.isOn ? AppTheme.primary : AppTheme.textSecondary,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Switch(
-                value: device.isOn,
-                onChanged: (_) => onToggle(),
-                activeColor: AppTheme.primary,
-                activeTrackColor: AppTheme.primaryLight,
-              ),
-            ],
-          ),
+                const SizedBox(width: 8),
+                Switch(
+                  value: device.isOn,
+                  onChanged: device.isAuto ? null : (_) => onToggle(),
+                  activeColor: AppTheme.primary,
+                  activeTrackColor: AppTheme.primaryLight,
+                ),
+              ],
+            ),
           ),
         ],
       ),

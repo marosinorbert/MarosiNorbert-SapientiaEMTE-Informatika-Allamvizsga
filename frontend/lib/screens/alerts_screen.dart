@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../utils/responsive.dart';
+import '../services/api_service.dart';
 
 enum AlertSeverity { ok, warning, critical }
 
@@ -52,44 +53,54 @@ class AlertsScreen extends StatefulWidget {
 }
 
 class _AlertsScreenState extends State<AlertsScreen> {
-  final List<AlertEntry> _alerts = [
-    AlertEntry(
-      id: 1,
-      title: 'Magas hőmérséklet',
-      message: 'A hőmérséklet elérte a 27.8°C-t, közel a 28°C-os határhoz.',
-      severity: AlertSeverity.warning,
-      sensor: 'DHT22 — Hőmérséklet',
-      time: '14:32',
-      acknowledged: false,
-    ),
-    AlertEntry(
-      id: 2,
-      title: 'Alacsony talajnedvesség',
-      message: 'A talajnedvesség 38%-ra csökkent, az öntözőrendszer aktiválása javasolt.',
-      severity: AlertSeverity.critical,
-      sensor: 'Talajnedvesség szenzor',
-      time: '13:15',
-      acknowledged: false,
-    ),
-    AlertEntry(
-      id: 3,
-      title: 'Páratartalom normális',
-      message: 'A páratartalom a célértéken belül van (62%).',
-      severity: AlertSeverity.ok,
-      sensor: 'DHT22 — Páratartalom',
-      time: '12:00',
-      acknowledged: true,
-    ),
-    AlertEntry(
-      id: 4,
-      title: 'Fényerő alacsony',
-      message: 'A fényerő 4200 lux alá esett, a növénylámpa automatikusan bekapcsolt.',
-      severity: AlertSeverity.warning,
-      sensor: 'Fényszenzor (BH1750)',
-      time: '11:47',
-      acknowledged: false,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadAlerts();
+  }
+
+  Future<void> _loadAlerts() async {
+    try {
+      final alerts = await ApiService.getAlerts();
+
+      setState(() {
+        _alerts = alerts.map<AlertEntry>((a) {
+          return AlertEntry(
+            id: a['id'],
+            title: a['title'],
+            message: a['message'],
+            severity: _parseSeverity(a['severity']),
+            sensor: a['sensor'] ?? '',
+            time: a['created_at'].toString(),
+            acknowledged: a['acknowledged'] ?? false,
+          );
+        }).toList();
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  AlertSeverity _parseSeverity(String value) {
+    switch (value) {
+      case 'critical':
+        return AlertSeverity.critical;
+      case 'warning':
+        return AlertSeverity.warning;
+      default:
+        return AlertSeverity.ok;
+    }
+  }
+
+  List<AlertEntry> _alerts = [];
+
+  bool _isLoading = true;
+  String? _error;
 
   final List<AlertRule> _rules = [
     AlertRule(
@@ -130,15 +141,65 @@ class _AlertsScreenState extends State<AlertsScreen> {
     ),
   ];
 
-  void _acknowledge(int id) {
-    setState(() {
-      final alert = _alerts.firstWhere((a) => a.id == id);
-      alert.acknowledged = true;
-    });
+  Future<void> _acknowledge(int id) async {
+    await ApiService.acknowledgeAlert(id);
+    await _loadAlerts();
   }
 
-  void _dismiss(int id) {
-    setState(() => _alerts.removeWhere((a) => a.id == id));
+  Future<void> _dismiss(int id) async {
+    try {
+      await ApiService.deleteAlert(id);
+
+      setState(() {
+        _alerts.removeWhere((a) => a.id == id);
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nem sikerült törölni a riasztást: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteAllAlerts() async {
+    if (_alerts.isEmpty) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Összes riasztás törlése'),
+        content: const Text(
+          'Biztosan törölni szeretnéd az összes riasztást? Ez az adatbázisból is törli őket.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Mégse'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Törlés'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await ApiService.deleteAllAlerts();
+
+      setState(() {
+        _alerts.clear();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nem sikerült törölni a riasztásokat: $e')),
+      );
+    }
   }
 
   void _toggleRule(int id) {
@@ -148,146 +209,116 @@ class _AlertsScreenState extends State<AlertsScreen> {
     });
   }
 
-  int get _activeCount =>
-      _alerts.where((a) => !a.acknowledged).length;
+  int get _activeCount => _alerts.where((a) => !a.acknowledged).length;
 
   @override
   Widget build(BuildContext context) {
-return SingleChildScrollView(
-  child: Column(      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                RichText(
-                  text: const TextSpan(
-                    children: [
-                      TextSpan(
-                        text: 'Riasztás ',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w400,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      TextSpan(
-                        text: 'kezelő',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Aktív riasztások és szabályok kezelése',
-                  style: TextStyle(
-                      fontSize: 14, color: AppTheme.textSecondary),
-                ),
-              ],
-            ),
-            if (_activeCount > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF2F2),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                      color: const Color(0xFFEF4444).withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.notifications_active_rounded,
-                        size: 14, color: Color(0xFFEF4444)),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$_activeCount aktív',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFFEF4444),
-                      ),
-                    ),
-                  ],
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Text(_error!),
+      );
+    }
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Aktív riasztások',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
                 ),
               ),
-          ],
-        ),
-
-        const SizedBox(height: 24),
-
-        // Active alerts
-        const Text(
-          'Aktív riasztások',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+              if (_alerts.isNotEmpty)
+                TextButton.icon(
+                  onPressed: _deleteAllAlerts,
+                  icon: const Icon(Icons.delete_sweep_rounded, size: 16),
+                  label: const Text('Összes törlése'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFEF4444),
+                  ),
+                ),
+            ],
           ),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
 
-        if (_alerts.isEmpty)
-          _EmptyState()
-        else
-          ...(_alerts.isEmpty
-              ? []
-              : _alerts
-                  .map((a) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _AlertCard(
-                          alert: a,
-                          onAcknowledge: () => _acknowledge(a.id),
-                          onDismiss: () => _dismiss(a.id),
-                        ),
-                      ))
-                  .toList()),
+          const SizedBox(height: 24),
 
-        const SizedBox(height: 24),
+          // Active alerts
+          const Text(
+            'Aktív riasztások',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
 
-        // Rules
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Riasztás szabályok',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
+          if (_alerts.isEmpty)
+            _EmptyState()
+          else
+            ...(_alerts.isEmpty
+                ? []
+                : _alerts
+                    .map((a) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _AlertCard(
+                            alert: a,
+                            onAcknowledge: () => _acknowledge(a.id),
+                            onDismiss: () => _dismiss(a.id),
+                          ),
+                        ))
+                    .toList()),
+
+          const SizedBox(height: 24),
+
+          // Rules
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Riasztás szabályok',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
               ),
-            ),
-            Text(
-              '${_rules.where((r) => r.enabled).length}/${_rules.length} aktív',
-              style: const TextStyle(
-                  fontSize: 12, color: AppTheme.textSecondary),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
+              Text(
+                '${_rules.where((r) => r.enabled).length}/${_rules.length} aktív',
+                style: const TextStyle(
+                    fontSize: 12, color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
 
-        ..._rules
-            .map((r) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _RuleCard(
-                    rule: r,
-                    onToggle: () => _toggleRule(r.id),
-                  ),
-                ))
-            .toList(),
+          ..._rules
+              .map((r) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _RuleCard(
+                      rule: r,
+                      onToggle: () => _toggleRule(r.id),
+                    ),
+                  ))
+              .toList(),
 
-        const SizedBox(height: 28),
-      ],
-  ),
+          const SizedBox(height: 28),
+        ],
+      ),
     );
   }
 }
@@ -392,8 +423,8 @@ class _AlertCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: _iconColor.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(16),
@@ -411,8 +442,8 @@ class _AlertCard extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               alert.message,
-              style: const TextStyle(
-                  fontSize: 12, color: AppTheme.textSecondary),
+              style:
+                  const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
             ),
             const SizedBox(height: 8),
             Row(
@@ -426,8 +457,7 @@ class _AlertCard extends StatelessWidget {
                     Text(
                       alert.sensor,
                       style: const TextStyle(
-                          fontSize: 10,
-                          color: AppTheme.textSecondary),
+                          fontSize: 10, color: AppTheme.textSecondary),
                     ),
                     const SizedBox(width: 12),
                     const Icon(Icons.access_time_rounded,
@@ -436,8 +466,7 @@ class _AlertCard extends StatelessWidget {
                     Text(
                       alert.time,
                       style: const TextStyle(
-                          fontSize: 10,
-                          color: AppTheme.textSecondary),
+                          fontSize: 10, color: AppTheme.textSecondary),
                     ),
                   ],
                 ),
@@ -613,8 +642,7 @@ class _EmptyState extends StatelessWidget {
           SizedBox(height: 3),
           Text(
             'Minden rendszer normálisan működik.',
-            style: TextStyle(
-                fontSize: 12, color: AppTheme.textSecondary),
+            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
           ),
         ],
       ),
