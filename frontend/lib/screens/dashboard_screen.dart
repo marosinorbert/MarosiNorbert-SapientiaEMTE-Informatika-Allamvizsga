@@ -76,8 +76,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       for (final deviceJson in devicesJson) {
         final deviceName = deviceJson['device_name'];
-        final isOn = deviceJson['is_on'];
-        final isAuto = deviceJson['is_auto'];
+        final isOn = deviceJson['is_on'] ?? false;
+        final isAuto = deviceJson['is_auto'] ?? false;
 
         if (deviceName == 'pump') {
           _devices.firstWhere((d) => d.name == 'Öntözőrendszer').isOn = isOn;
