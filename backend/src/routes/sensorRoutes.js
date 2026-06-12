@@ -81,8 +81,8 @@ router.post('/', async (req, res) => {
   const result = await pool.query(
     `
 INSERT INTO sensor_data 
-(temperature, humidity, soil_moisture, light_on, pump_on)
-VALUES ($1, $2, $3, $4, $5)
+(temperature, humidity, soil_moisture, water_detected, light_on, pump_on)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *
     `,
     [temperature, humidity, soilMoisture, waterDetected, lightOn, pumpOn]
