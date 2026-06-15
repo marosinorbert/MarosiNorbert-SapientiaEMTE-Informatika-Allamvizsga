@@ -28,10 +28,6 @@ const char* API_BASE_URL = "https://kabob-headcount-silk.ngrok-free.dev/api";
 #define PUMP_RELAY_PIN 3
 #define LIGHT_PIN 38
 
-#define HEATER_RELAY_PIN 21
-
-#define FAN_PIN 47
-
 // Relay logic
 #define RELAY_ON LOW
 #define RELAY_OFF HIGH
@@ -64,10 +60,6 @@ bool waterDetected = true;
 bool pumpOn = false;
 bool lightOn = false;
 
-bool heaterOn = false;
-
-bool fanOn = false;
-
 int readSoilMoisturePercent() {
   int raw = analogRead(SOIL_AO_PIN);
 
@@ -91,17 +83,6 @@ void setLight(bool state) {
   lightOn = state;
   digitalWrite(LIGHT_PIN, state ? HIGH : LOW);
 }
-
-void setHeater(bool state) {
-  heaterOn = state;
-  digitalWrite(HEATER_RELAY_PIN, state ? HIGH : LOW);
-}
-
-void setFan(bool state) {
-  fanOn = state;
-  digitalWrite(FAN_PIN, state ? HIGH : LOW);
-}
-
 
 void readSensors() {
   float t = dht.readTemperature();
@@ -133,8 +114,6 @@ void sendSensorData() {
   doc["waterDetected"] = waterDetected;
   doc["lightOn"] = lightOn;
   doc["pumpOn"] = pumpOn;
-  doc["heaterOn"] = heaterOn;
-  doc["fanOn"] = fanOn;
 
   String body;
   serializeJson(doc, body);
@@ -170,9 +149,6 @@ void fetchCommands() {
     if (!error) {
       bool commandPump = doc["pump"] | false;
       bool commandLight = doc["light"] | false;
-      bool commandHeater = doc["heater"] | false;
-      bool commandFan = doc["fan"] | false;
-
 
       if (!waterDetected && commandPump) {
         setPump(false);
@@ -181,8 +157,6 @@ void fetchCommands() {
       }
 
       setLight(commandLight);
-      setHeater(commandHeater);
-      setFan(commandFan);
     }
   }
 
@@ -253,12 +227,6 @@ void drawDisplay() {
     display.print("Light: ");
     display.println(lightOn ? "ON" : "OFF");
 
-    display.print("Heat:  ");
-    display.println(heaterOn ? "ON" : "OFF");
-
-    display.print("Fan:  ");
-    display.println(fanOn ? "ON" : "OFF");
-
     display.print("WiFi: ");
     display.println(WiFi.status() == WL_CONNECTED ? "OK" : "NO");
   }
@@ -290,14 +258,8 @@ void setup() {
   pinMode(PUMP_RELAY_PIN, OUTPUT);
   pinMode(LIGHT_PIN, OUTPUT);
 
-  pinMode(HEATER_RELAY_PIN, OUTPUT);
-
-  pinMode(FAN_PIN, OUTPUT);
-
   setPump(false);
   setLight(false);
-  setHeater(false);
-  setFan(false);
 
   dht.begin();
 
