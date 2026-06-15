@@ -33,6 +33,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return fallback;
   }
 
+  double _hourFromCreatedAt(dynamic value) {
+    if (value == null) return 0;
+
+    final dateTime = DateTime.tryParse(value.toString());
+    if (dateTime == null) return 0;
+
+    final localTime = dateTime.toLocal();
+
+    return localTime.hour + (localTime.minute / 60.0);
+  }
+
   SensorData _data = SensorData.dummy;
   final List<DeviceState> _devices = DeviceState.dummyDevices;
 
@@ -64,26 +75,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadSensorData() async {
     try {
       final latestJson = await ApiService.getLatestSensorData();
-      final historyJson = await ApiService.getSensorHistory(hours: 24);
+      final historyJson = await ApiService.getSensorHistory(today: true);
       final devicesJson = await ApiService.getDevices();
       final settingsJson = await ApiService.getSettings();
 
       final tempSpots = <FlSpot>[];
       final humiditySpots = <FlSpot>[];
 
-      for (int i = 0; i < historyJson.length; i++) {
-        final item = historyJson[i];
+      for (final item in historyJson) {
+        final hour = _hourFromCreatedAt(item['createdAt']);
 
         tempSpots.add(
           FlSpot(
-            i.toDouble(),
+            hour,
             (item['temperature'] ?? 0).toDouble(),
           ),
         );
 
         humiditySpots.add(
           FlSpot(
-            i.toDouble(),
+            hour,
             (item['humidity'] ?? 0).toDouble(),
           ),
         );
@@ -366,6 +377,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 fillColor: AppTheme.primary.withOpacity(0.1),
                 minY: 0,
                 maxY: 40,
+                unit: '°C',
               ),
               ChartCard(
                 title: 'Páratartalom',
@@ -376,6 +388,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 fillColor: const Color(0xFF60A5FA).withOpacity(0.1),
                 minY: 0,
                 maxY: 100,
+                unit: '%',
               ),
             ],
           ),
