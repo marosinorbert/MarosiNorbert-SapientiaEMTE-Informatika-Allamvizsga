@@ -45,11 +45,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
+  double _hourFromFormattedCreatedAt(dynamic value) {
+    if (value == null) return 0;
+
+    final text = value.toString();
+    final match = RegExp(r'(\d{1,2}):(\d{2}):(\d{2})').firstMatch(text);
+
+    if (match == null) return 0;
+
+    final hour = int.tryParse(match.group(1) ?? '0') ?? 0;
+    final minute = int.tryParse(match.group(2) ?? '0') ?? 0;
+
+    return hour + (minute / 60.0);
+  }
+
   Future<void> _loadSensorData() async {
     try {
       final latestJson = await ApiService.getLatestSensorData();
       final historyJson = await ApiService.getSensorHistory(
-        hours: 24,
+        today: true,
       );
       final devicesJson = await ApiService.getDevices();
 
@@ -58,17 +72,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       for (int i = 0; i < historyJson.length; i++) {
         final item = historyJson[i];
-
+        final hour = _hourFromFormattedCreatedAt(item['createdAtFormatted']);
         tempSpots.add(
           FlSpot(
-            i.toDouble(),
+            hour,
             (item['temperature'] ?? 0).toDouble(),
           ),
         );
 
         humiditySpots.add(
           FlSpot(
-            i.toDouble(),
+            hour,
             (item['humidity'] ?? 0).toDouble(),
           ),
         );
@@ -107,7 +121,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           humidity: (latestJson['humidity'] ?? 0).toDouble(),
           soilMoisture: (latestJson['soilMoisture'] ?? 0).toDouble(),
           lightIntensity: 0,
-          lastUpdated: latestJson['createdAt'] ?? 'Most',
+          lastUpdated: latestJson['createdAtFormatted'] ?? 'Most',
         );
 
         _tempSpots = tempSpots;

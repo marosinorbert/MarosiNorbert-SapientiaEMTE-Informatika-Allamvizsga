@@ -254,6 +254,18 @@ class _SensorsScreenState extends State<SensorsScreen> {
     required double minY,
     required double maxY,
   }) {
+    final safeSpots = spots.isEmpty ? [const FlSpot(0, 0)] : spots;
+
+    final dataMinY = safeSpots.map((e) => e.y).reduce((a, b) => a < b ? a : b);
+    final dataMaxY = safeSpots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
+
+    final chartMinY = ((dataMinY < minY ? dataMinY : minY) - 5).floorToDouble();
+
+    final chartMaxY = ((dataMaxY > maxY ? dataMaxY : maxY) + 5).ceilToDouble();
+
+    final double chartInterval =
+        (chartMaxY - chartMinY) == 0 ? 1.0 : (chartMaxY - chartMinY) / 4.0;
+
     return Container(
       height: 160,
       padding: const EdgeInsets.all(16),
@@ -271,12 +283,14 @@ class _SensorsScreenState extends State<SensorsScreen> {
       ),
       child: LineChart(
         LineChartData(
-          minY: minY,
-          maxY: maxY,
+          minX: 0,
+          maxX: 24,
+          minY: chartMinY,
+          maxY: chartMaxY,
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            horizontalInterval: (maxY - minY) / 4,
+            horizontalInterval: chartInterval,
             getDrawingHorizontalLine: (_) =>
                 const FlLine(color: Color(0xFFF0F0F0), strokeWidth: 1),
           ),
@@ -289,7 +303,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                interval: (maxY - minY) / 4,
+                interval: chartInterval,
                 reservedSize: 32,
                 getTitlesWidget: (v, _) => Text(
                   v.toInt().toString(),
@@ -301,18 +315,36 @@ class _SensorsScreenState extends State<SensorsScreen> {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                interval: 3,
-                getTitlesWidget: (v, _) => Text(
-                  '${(14 + v.toInt()) % 24}:00',
-                  style: const TextStyle(
-                      fontSize: 10, color: AppTheme.textSecondary),
-                ),
+                interval: 6.0,
+                reservedSize: 30,
+                getTitlesWidget: (v, _) {
+                  final hour = v.toInt();
+
+                  if (hour < 0 || hour > 24) {
+                    return const SizedBox.shrink();
+                  }
+
+                  if (hour == 24) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '${hour.toString().padLeft(2, '0')}:00',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
           lineBarsData: [
             LineChartBarData(
-              spots: spots,
+              spots: safeSpots,
               isCurved: true,
               color: lineColor,
               barWidth: 2.5,

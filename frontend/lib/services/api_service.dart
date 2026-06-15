@@ -29,10 +29,13 @@ class ApiService {
   static Future<List<dynamic>> getSensorHistory({
     int? hours,
     int? days,
+    bool today = false,
   }) async {
     String url = '$baseUrl/sensors/history';
 
-    if (hours != null) {
+    if (today) {
+      url += '?today=true';
+    } else if (hours != null) {
       url += '?hours=$hours';
     } else if (days != null) {
       url += '?days=$days';
