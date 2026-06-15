@@ -17,6 +17,22 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  double _tempMin = 18;
+  double _tempMax = 28;
+  double _humidityMin = 50;
+  double _humidityMax = 75;
+  double _soilMin = 35;
+  double _soilMax = 80;
+  double _lightMin = 800;
+  double _lightMax = 3000;
+
+  double _toDouble(dynamic value, double fallback) {
+    if (value == null) return fallback;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
   SensorData _data = SensorData.dummy;
   final List<DeviceState> _devices = DeviceState.dummyDevices;
 
@@ -48,10 +64,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadSensorData() async {
     try {
       final latestJson = await ApiService.getLatestSensorData();
-      final historyJson = await ApiService.getSensorHistory(
-        hours: 24,
-      );
+      final historyJson = await ApiService.getSensorHistory(hours: 24);
       final devicesJson = await ApiService.getDevices();
+      final settingsJson = await ApiService.getSettings();
 
       final tempSpots = <FlSpot>[];
       final humiditySpots = <FlSpot>[];
@@ -102,6 +117,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       setState(() {
+        _tempMin = _toDouble(settingsJson['temp_min'], 18);
+        _tempMax = _toDouble(settingsJson['temp_max'], 28);
+
+        _humidityMin = _toDouble(settingsJson['humidity_min'], 50);
+        _humidityMax = _toDouble(settingsJson['humidity_max'], 75);
+
+        _soilMin = _toDouble(settingsJson['soil_min'], 35);
+        _soilMax = _toDouble(settingsJson['soil_max'], 80);
+
+        _lightMin = _toDouble(settingsJson['light_min'], 800);
+        _lightMax = _toDouble(settingsJson['light_max'], 3000);
+
         _data = SensorData(
           temperature: (latestJson['temperature'] ?? 0).toDouble(),
           humidity: (latestJson['humidity'] ?? 0).toDouble(),
@@ -267,28 +294,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 title: 'Hőmérséklet',
                 value: '${_data.temperature}',
                 unit: '°C',
-                subtitle: 'Cél: 18° - 28°',
+                subtitle: 'Cél: ${_tempMin.toInt()}° - ${_tempMax.toInt()}°',
                 icon: Icons.thermostat_rounded,
               ),
               StatCard(
                 title: 'Páratartalom',
                 value: '${_data.humidity.toInt()}',
                 unit: '%',
-                subtitle: 'Cél: 50% - 75%',
+                subtitle:
+                    'Cél: ${_humidityMin.toInt()}% - ${_humidityMax.toInt()}%',
                 icon: Icons.water_drop_rounded,
               ),
               StatCard(
                 title: 'Talajnedvesség',
                 value: '${_data.soilMoisture.toInt()}',
                 unit: '%',
-                subtitle: 'Min: 35%',
+                subtitle: 'Cél: ${_soilMin.toInt()}% - ${_soilMax.toInt()}%',
                 icon: Icons.eco_rounded,
               ),
               StatCard(
                 title: 'Fényerősség',
                 value: '${_data.lightIntensity.toInt()}',
                 unit: 'lux',
-                subtitle: 'Optimális tartomány',
+                subtitle:
+                    'Cél: ${_lightMin.toInt()} - ${_lightMax.toInt()} lux',
                 icon: Icons.wb_sunny_rounded,
               ),
             ],
