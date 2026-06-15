@@ -17,6 +17,33 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  double _tempMin = 18;
+  double _tempMax = 28;
+  double _humidityMin = 50;
+  double _humidityMax = 75;
+  double _soilMin = 35;
+  double _soilMax = 80;
+  double _lightMin = 800;
+  double _lightMax = 3000;
+
+  double _toDouble(dynamic value, double fallback) {
+    if (value == null) return fallback;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  double _hourFromCreatedAt(dynamic value) {
+    if (value == null) return 0;
+
+    final dateTime = DateTime.tryParse(value.toString());
+    if (dateTime == null) return 0;
+
+    final localTime = dateTime.toLocal();
+
+    return localTime.hour + (localTime.minute / 60.0);
+  }
+
   SensorData _data = SensorData.dummy;
   final List<DeviceState> _devices = DeviceState.dummyDevices;
 
@@ -45,34 +72,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  double _hourFromFormattedCreatedAt(dynamic value) {
-    if (value == null) return 0;
-
-    final text = value.toString();
-    final match = RegExp(r'(\d{1,2}):(\d{2}):(\d{2})').firstMatch(text);
-
-    if (match == null) return 0;
-
-    final hour = int.tryParse(match.group(1) ?? '0') ?? 0;
-    final minute = int.tryParse(match.group(2) ?? '0') ?? 0;
-
-    return hour + (minute / 60.0);
-  }
-
   Future<void> _loadSensorData() async {
     try {
       final latestJson = await ApiService.getLatestSensorData();
-      final historyJson = await ApiService.getSensorHistory(
-        today: true,
-      );
+      final historyJson = await ApiService.getSensorHistory(today: true);
       final devicesJson = await ApiService.getDevices();
+      final settingsJson = await ApiService.getSettings();
 
       final tempSpots = <FlSpot>[];
       final humiditySpots = <FlSpot>[];
 
-      for (int i = 0; i < historyJson.length; i++) {
-        final item = historyJson[i];
-        final hour = _hourFromFormattedCreatedAt(item['createdAtFormatted']);
+      for (final item in historyJson) {
+        final hour = _hourFromCreatedAt(item['createdAt']);
+
         tempSpots.add(
           FlSpot(
             hour,
@@ -90,8 +102,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       for (final deviceJson in devicesJson) {
         final deviceName = deviceJson['device_name'];
-        final isOn = deviceJson['is_on'];
-        final isAuto = deviceJson['is_auto'];
+        final isOn = deviceJson['is_on'] ?? false;
+        final isAuto = deviceJson['is_auto'] ?? false;
 
         if (deviceName == 'pump') {
           _devices.firstWhere((d) => d.name == 'Öntözőrendszer').isOn = isOn;
@@ -116,12 +128,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
 
       setState(() {
+        _tempMin = _toDouble(settingsJson['temp_min'], 18);
+        _tempMax = _toDouble(settingsJson['temp_max'], 28);
+
+        _humidityMin = _toDouble(settingsJson['humidity_min'], 50);
+        _humidityMax = _toDouble(settingsJson['humidity_max'], 75);
+
+        _soilMin = _toDouble(settingsJson['soil_min'], 35);
+        _soilMax = _toDouble(settingsJson['soil_max'], 80);
+
+        _lightMin = _toDouble(settingsJson['light_min'], 800);
+        _lightMax = _toDouble(settingsJson['light_max'], 3000);
+
         _data = SensorData(
           temperature: (latestJson['temperature'] ?? 0).toDouble(),
           humidity: (latestJson['humidity'] ?? 0).toDouble(),
           soilMoisture: (latestJson['soilMoisture'] ?? 0).toDouble(),
           lightIntensity: 0,
-          lastUpdated: latestJson['createdAtFormatted'] ?? 'Most',
+          lastUpdated: latestJson['createdAt'] ?? 'Most',
         );
 
         _tempSpots = tempSpots;
@@ -281,28 +305,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 title: 'Hőmérséklet',
                 value: '${_data.temperature}',
                 unit: '°C',
-                subtitle: 'Cél: 18° - 28°',
+                subtitle: 'Cél: ${_tempMin.toInt()}° - ${_tempMax.toInt()}°',
                 icon: Icons.thermostat_rounded,
               ),
               StatCard(
                 title: 'Páratartalom',
                 value: '${_data.humidity.toInt()}',
                 unit: '%',
-                subtitle: 'Cél: 50% - 75%',
+                subtitle:
+                    'Cél: ${_humidityMin.toInt()}% - ${_humidityMax.toInt()}%',
                 icon: Icons.water_drop_rounded,
               ),
               StatCard(
                 title: 'Talajnedvesség',
                 value: '${_data.soilMoisture.toInt()}',
                 unit: '%',
-                subtitle: 'Min: 35%',
+                subtitle: 'Cél: ${_soilMin.toInt()}% - ${_soilMax.toInt()}%',
                 icon: Icons.eco_rounded,
               ),
               StatCard(
                 title: 'Fényerősség',
                 value: '${_data.lightIntensity.toInt()}',
                 unit: 'lux',
-                subtitle: 'Optimális tartomány',
+                subtitle:
+                    'Cél: ${_lightMin.toInt()} - ${_lightMax.toInt()} lux',
                 icon: Icons.wb_sunny_rounded,
               ),
             ],
@@ -351,6 +377,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 fillColor: AppTheme.primary.withOpacity(0.1),
                 minY: 0,
                 maxY: 40,
+                unit: '°C',
               ),
               ChartCard(
                 title: 'Páratartalom',
@@ -361,6 +388,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 fillColor: const Color(0xFF60A5FA).withOpacity(0.1),
                 minY: 0,
                 maxY: 100,
+                unit: '%',
               ),
             ],
           ),

@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   static const String baseUrl =
-      'https://kabob-headcount-silk.ngrok-free.dev/api';
+      'https://cultivate-radar-swimmer.ngrok-free.dev/api';
 
   static const Map<String, String> headers = {
     'Content-Type': 'application/json',
@@ -105,6 +105,9 @@ class ApiService {
     required double soilMax,
     required double lightMin,
     required double lightMax,
+    required bool darkMode,
+    required String language,
+    required String tempUnit,
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/settings'),
@@ -118,6 +121,9 @@ class ApiService {
         'soilMax': soilMax,
         'lightMin': lightMin,
         'lightMax': lightMax,
+        'darkMode': darkMode,
+        'language': language,
+        'tempUnit': tempUnit,
       }),
     );
 

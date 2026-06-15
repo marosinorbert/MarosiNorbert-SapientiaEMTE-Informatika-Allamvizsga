@@ -11,7 +11,7 @@ const char* WIFI_SSID = "Marosi";
 const char* WIFI_PASSWORD = "Marosi65A";
 
 // Backend ngrok URL
-const char* API_BASE_URL = "https://kabob-headcount-silk.ngrok-free.dev/api";
+const char* API_BASE_URL = "https://cultivate-radar-swimmer.ngrok-free.dev/api";
 
 // Pins
 #define OLED_SDA 13
