@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../services/api_service.dart';
 
 class Plant {
   final int id;
@@ -38,10 +39,12 @@ class PlantsScreen extends StatefulWidget {
 
 class _PlantsScreenState extends State<PlantsScreen> {
   // Aktuális szenzor értékek (1 db szenzor)
-  final double _currentTemp = 24.5;
-  final double _currentHumidity = 62;
-  final double _currentSoil = 45;
-  final double _currentLight = 12500;
+  double _currentTemp = 0;
+  double _currentHumidity = 0;
+  double _currentSoil = 0;
+  double _currentLight = 0;
+
+  bool _isLoading = true;
 
   int _nextId = 4;
 
@@ -86,6 +89,41 @@ class _PlantsScreenState extends State<PlantsScreen> {
       idealLightMin: 5000,
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentSensorData();
+  }
+
+  double _toDouble(dynamic value, double fallback) {
+    if (value == null) return fallback;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  Future<void> _loadCurrentSensorData() async {
+    try {
+      final data = await ApiService.getLatestSensorData();
+
+      if (!mounted) return;
+
+      setState(() {
+        _currentTemp = _toDouble(data['temperature'], 0);
+        _currentHumidity = _toDouble(data['humidity'], 0);
+        _currentSoil = _toDouble(data['soilMoisture'], 0);
+        _currentLight = _toDouble(data['lightIntensity'], 0);
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   String _daysSince(DateTime date) {
     final diff = DateTime.now().difference(date).inDays;
@@ -168,8 +206,8 @@ class _PlantsScreenState extends State<PlantsScreen> {
                                       : Colors.transparent,
                                 ),
                               ),
-                              child: Text(e,
-                                  style: const TextStyle(fontSize: 20)),
+                              child:
+                                  Text(e, style: const TextStyle(fontSize: 20)),
                             ),
                           ))
                       .toList(),
@@ -190,8 +228,7 @@ class _PlantsScreenState extends State<PlantsScreen> {
                         color: AppTheme.textSecondary)),
                 const SizedBox(height: 6),
                 _DialogField(
-                    controller: speciesCtrl,
-                    hint: 'pl. Solanum lycopersicum'),
+                    controller: speciesCtrl, hint: 'pl. Solanum lycopersicum'),
               ],
             ),
           ),
@@ -242,8 +279,7 @@ class _PlantsScreenState extends State<PlantsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Növény törlése',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
         content: Text(
@@ -274,53 +310,51 @@ class _PlantsScreenState extends State<PlantsScreen> {
     );
   }
 
-@override
-Widget build(BuildContext context) {
-
-  
-  return SingleChildScrollView(
-    child: Column(
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
           Row(
-  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-  children: [
-    Expanded(
-      child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RichText(
-                    text: const TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'Növény ',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w400,
-                            color: AppTheme.textPrimary,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RichText(
+                      text: const TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Növény ',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w400,
+                              color: AppTheme.textPrimary,
+                            ),
                           ),
-                        ),
-                        TextSpan(
-                          text: 'profilok',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.primary,
+                          TextSpan(
+                            text: 'profilok',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.primary,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Növény állapotok az aktuális szenzor adatok alapján',
-                    style: TextStyle(
-                        fontSize: 14, color: AppTheme.textSecondary),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Növény állapotok az aktuális szenzor adatok alapján',
+                      style: TextStyle(
+                          fontSize: 14, color: AppTheme.textSecondary),
+                    ),
+                  ],
+                ),
               ),
-    ),
               ElevatedButton.icon(
                 onPressed: _showAddDialog,
                 icon: const Icon(Icons.add_rounded, size: 18),
@@ -328,8 +362,8 @@ Widget build(BuildContext context) {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
@@ -345,45 +379,44 @@ Widget build(BuildContext context) {
             decoration: BoxDecoration(
               color: AppTheme.primaryLight,
               borderRadius: BorderRadius.circular(12),
-              border:
-                  Border.all(color: AppTheme.primary.withOpacity(0.3)),
+              border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
             ),
             child: Wrap(
-  spacing: 8,
-  runSpacing: 8,
-  crossAxisAlignment: WrapCrossAlignment.center,
-  children: [
-    const Icon(
-      Icons.sensors_rounded,
-      color: AppTheme.primary,
-      size: 18,
-    ),
-    const Text(
-      'Aktuális értékek:',
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: AppTheme.primary,
-      ),
-    ),
-    _SensorBadge(
-      label: '${_currentTemp}°C',
-      icon: Icons.thermostat_rounded,
-    ),
-    _SensorBadge(
-      label: '${_currentHumidity.toInt()}%',
-      icon: Icons.water_drop_rounded,
-    ),
-    _SensorBadge(
-      label: '${_currentSoil.toInt()}% talaj',
-      icon: Icons.eco_rounded,
-    ),
-    _SensorBadge(
-      label: '${_currentLight.toInt()} lux',
-      icon: Icons.wb_sunny_rounded,
-    ),
-  ],
-),
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Icon(
+                  Icons.sensors_rounded,
+                  color: AppTheme.primary,
+                  size: 18,
+                ),
+                const Text(
+                  'Aktuális értékek:',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primary,
+                  ),
+                ),
+                _SensorBadge(
+                  label: '${_currentTemp.toStringAsFixed(1)}°C',
+                  icon: Icons.thermostat_rounded,
+                ),
+                _SensorBadge(
+                  label: '${_currentHumidity.toStringAsFixed(1)}%',
+                  icon: Icons.water_drop_rounded,
+                ),
+                _SensorBadge(
+                  label: '${_currentSoil.toStringAsFixed(1)}%',
+                  icon: Icons.eco_rounded,
+                ),
+                _SensorBadge(
+                  label: '${_currentLight.toInt()} lux',
+                  icon: Icons.wb_sunny_rounded,
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(height: 24),
@@ -429,7 +462,6 @@ Widget build(BuildContext context) {
             ),
         ],
       ),
-
     );
   }
 }
@@ -492,13 +524,12 @@ class _PlantCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: healthColor.withOpacity(0.06),
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: Row(
               children: [
-                Text(plant.emoji,
-                    style: const TextStyle(fontSize: 36)),
+                Text(plant.emoji, style: const TextStyle(fontSize: 36)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -524,8 +555,7 @@ class _PlantCard extends StatelessWidget {
                       Text(
                         'Ültetve: $daysSince',
                         style: const TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.textSecondary),
+                            fontSize: 11, color: AppTheme.textSecondary),
                       ),
                     ],
                   ),
@@ -574,8 +604,7 @@ class _PlantCard extends StatelessWidget {
                     icon: Icons.thermostat_rounded,
                     label: 'Hőmérséklet',
                     current: '${currentTemp}°C',
-                    ideal:
-                        '${plant.idealTempMin}–${plant.idealTempMax}°C',
+                    ideal: '${plant.idealTempMin}–${plant.idealTempMax}°C',
                     isOk: tempOk,
                   ),
                   const SizedBox(height: 8),
@@ -616,13 +645,11 @@ class _PlantCard extends StatelessWidget {
               icon: const Icon(Icons.delete_outline_rounded,
                   size: 16, color: Color(0xFFEF4444)),
               label: const Text('Törlés',
-                  style: TextStyle(
-                      fontSize: 12, color: Color(0xFFEF4444))),
+                  style: TextStyle(fontSize: 12, color: Color(0xFFEF4444))),
               style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
-                backgroundColor:
-                    const Color(0xFFEF4444).withOpacity(0.06),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                backgroundColor: const Color(0xFFEF4444).withOpacity(0.06),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
               ),
@@ -653,16 +680,15 @@ class _CompareRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        isOk ? AppTheme.primary : const Color(0xFFEF4444);
+    final color = isOk ? AppTheme.primary : const Color(0xFFEF4444);
     return Row(
       children: [
         Icon(icon, size: 14, color: AppTheme.textSecondary),
         const SizedBox(width: 6),
         Expanded(
           child: Text(label,
-              style: const TextStyle(
-                  fontSize: 12, color: AppTheme.textSecondary)),
+              style:
+                  const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
         ),
         Text(
           current,
@@ -681,8 +707,7 @@ class _CompareRow extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           ideal,
-          style: const TextStyle(
-              fontSize: 11, color: AppTheme.textSecondary),
+          style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
         ),
       ],
     );
@@ -739,12 +764,10 @@ class _DialogField extends StatelessWidget {
         hintStyle: const TextStyle(color: AppTheme.textSecondary),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: AppTheme.primary, width: 2),
+          borderSide: const BorderSide(color: AppTheme.primary, width: 2),
         ),
       ),
     );
@@ -782,8 +805,7 @@ class _EmptyPlants extends StatelessWidget {
           const SizedBox(height: 4),
           const Text(
             'Adj hozzá növényeket a feltételek figyeléséhez.',
-            style: TextStyle(
-                fontSize: 13, color: AppTheme.textSecondary),
+            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
