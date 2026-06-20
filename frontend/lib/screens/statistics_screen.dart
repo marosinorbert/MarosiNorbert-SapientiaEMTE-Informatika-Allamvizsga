@@ -46,6 +46,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   _SensorStats _lightStats = _SensorStats(min: 0, max: 0, avg: 0);
 
   List<FlSpot> _tempSpots = [];
+  List<FlSpot> _humiditySpots = [];
+  List<FlSpot> _soilSpots = [];
+  List<FlSpot> _lightSpots = [];
 
   List<_DeviceStats> get _deviceStats => [
         _DeviceStats(
@@ -112,6 +115,71 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     }
   }
 
+  double _toDouble(dynamic value, double fallback) {
+    if (value == null) return fallback;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  DateTime _rangeStart() {
+    final now = DateTime.now();
+
+    switch (_timeRange) {
+      case TimeRange.daily:
+        return now.subtract(const Duration(hours: 24));
+      case TimeRange.weekly:
+        return now.subtract(const Duration(days: 7));
+      case TimeRange.monthly:
+        return now.subtract(const Duration(days: 30));
+    }
+  }
+
+  double _xFromCreatedAt(dynamic value, DateTime start) {
+    final parsed = DateTime.tryParse(value?.toString() ?? '');
+
+    if (parsed == null) return 0;
+
+    final local = parsed.toLocal();
+    final diffMinutes = local.difference(start).inMinutes;
+
+    return diffMinutes / 1440;
+  }
+
+  List<FlSpot> _buildTrendSpots({
+    required List<dynamic> history,
+    required DateTime start,
+    required double Function(Map<String, dynamic> item) valueGetter,
+  }) {
+    final spots = <FlSpot>[];
+
+    for (final rawItem in history) {
+      final item = rawItem as Map<String, dynamic>;
+
+      final x = _timeRange == TimeRange.daily
+          ? localHourFromCreatedAt(item['createdAt'] ?? item['created_at'])
+          : _xFromCreatedAt(item['createdAt'] ?? item['created_at'], start);
+
+      final y = valueGetter(item);
+
+      spots.add(FlSpot(x, y));
+    }
+
+    spots.sort((a, b) => a.x.compareTo(b.x));
+
+    return spots;
+  }
+
+  double localHourFromCreatedAt(dynamic value) {
+    final parsed = DateTime.tryParse(value?.toString() ?? '');
+
+    if (parsed == null) return 0;
+
+    final local = parsed.toLocal();
+
+    return local.hour + (local.minute / 60.0);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -135,15 +203,24 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         history = await ApiService.getSensorHistory(days: 30);
       }
 
-      final temperatures = history
-          .map<double>((e) => (e['temperature'] ?? 0).toDouble())
-          .toList();
+      final rangeStart = _rangeStart();
+
+      final temperatures =
+          history.map<double>((e) => _toDouble(e['temperature'], 0)).toList();
 
       final humidities =
-          history.map<double>((e) => (e['humidity'] ?? 0).toDouble()).toList();
+          history.map<double>((e) => _toDouble(e['humidity'], 0)).toList();
 
-      final soilValues = history
-          .map<double>((e) => (e['soilMoisture'] ?? 0).toDouble())
+      final soilValues =
+          history.map<double>((e) => _toDouble(e['soilMoisture'], 0)).toList();
+
+      final lightValues = history
+          .map<double>(
+            (e) => _toDouble(
+              e['lightIntensity'] ?? e['light_intensity'] ?? e['light'],
+              0,
+            ),
+          )
           .toList();
 
       _SensorStats calculateStats(List<double> values) {
@@ -158,23 +235,44 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         return _SensorStats(min: min, max: max, avg: avg);
       }
 
-      final tempSpots = <FlSpot>[];
+      final tempSpots = _buildTrendSpots(
+        history: history,
+        start: rangeStart,
+        valueGetter: (item) => _toDouble(item['temperature'], 0),
+      );
 
-      for (int i = 0; i < temperatures.length; i++) {
-        tempSpots.add(
-          FlSpot(i.toDouble(), temperatures[i]),
-        );
-      }
+      final humiditySpots = _buildTrendSpots(
+        history: history,
+        start: rangeStart,
+        valueGetter: (item) => _toDouble(item['humidity'], 0),
+      );
+
+      final soilSpots = _buildTrendSpots(
+        history: history,
+        start: rangeStart,
+        valueGetter: (item) => _toDouble(item['soilMoisture'], 0),
+      );
+
+      final lightSpots = _buildTrendSpots(
+        history: history,
+        start: rangeStart,
+        valueGetter: (item) => _toDouble(
+          item['lightIntensity'] ?? item['light_intensity'] ?? item['light'],
+          0,
+        ),
+      );
 
       setState(() {
         _tempStats = calculateStats(temperatures);
         _humidityStats = calculateStats(humidities);
         _soilStats = calculateStats(soilValues);
-
-        // Fényszenzorod még nincs adatbázisban, ezért egyelőre 0.
-        _lightStats = _SensorStats(min: 0, max: 0, avg: 0);
+        _lightStats = calculateStats(lightValues);
 
         _tempSpots = tempSpots;
+        _humiditySpots = humiditySpots;
+        _soilSpots = soilSpots;
+        _lightSpots = lightSpots;
+
         _isLoading = false;
       });
     } catch (e) {
@@ -278,15 +376,17 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 1.4,
+                childAspectRatio: 1.15,
                 children: [
                   _StatCard(
                     title: 'Hőmérséklet',
                     icon: Icons.thermostat_rounded,
                     color: AppTheme.primary,
-                    min: '${tempStats.min}°C',
-                    max: '${tempStats.max}°C',
+                    min: '${tempStats.min.toStringAsFixed(1)}°C',
+                    max: '${tempStats.max.toStringAsFixed(1)}°C',
                     avg: '${tempStats.avg.toStringAsFixed(1)}°C',
+                    spots: _tempSpots,
+                    timeRange: _timeRange,
                   ),
                   _StatCard(
                     title: 'Páratartalom',
@@ -295,6 +395,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     min: '${humidityStats.min.toInt()}%',
                     max: '${humidityStats.max.toInt()}%',
                     avg: '${humidityStats.avg.toStringAsFixed(1)}%',
+                    spots: _humiditySpots,
+                    timeRange: _timeRange,
                   ),
                   _StatCard(
                     title: 'Talajnedvesség',
@@ -303,6 +405,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     min: '${soilStats.min.toInt()}%',
                     max: '${soilStats.max.toInt()}%',
                     avg: '${soilStats.avg.toStringAsFixed(1)}%',
+                    spots: _soilSpots,
+                    timeRange: _timeRange,
                   ),
                   _StatCard(
                     title: 'Fényerő',
@@ -311,29 +415,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     min: '${lightStats.min.toInt()} lux',
                     max: '${lightStats.max.toInt()} lux',
                     avg: '${lightStats.avg.toInt()} lux',
+                    spots: _lightSpots,
+                    timeRange: _timeRange,
                   ),
                 ],
               );
             },
-          ),
-
-          const SizedBox(height: 28),
-
-          // Trend chart
-          const Text(
-            'Hőmérséklet trend',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _TrendChart(
-            spots: _tempSpots.isEmpty ? [const FlSpot(0, 0)] : _tempSpots,
-            timeRange: _timeRange,
-            lineColor: AppTheme.primary,
-            fillColor: AppTheme.primary.withOpacity(0.1),
           ),
 
           const SizedBox(height: 28),
@@ -404,6 +491,8 @@ class _StatCard extends StatelessWidget {
   final String min;
   final String max;
   final String avg;
+  final List<FlSpot> spots;
+  final TimeRange timeRange;
 
   const _StatCard({
     required this.title,
@@ -412,6 +501,8 @@ class _StatCard extends StatelessWidget {
     required this.min,
     required this.max,
     required this.avg,
+    required this.spots,
+    required this.timeRange,
   });
 
   @override
@@ -529,116 +620,82 @@ class _StatCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 14),
+          Expanded(
+            child: _MiniTrendChart(
+              spots: spots,
+              color: color,
+              timeRange: timeRange,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Trend Chart ──────────────────────────────────────────
-
-class _TrendChart extends StatelessWidget {
+class _MiniTrendChart extends StatelessWidget {
   final List<FlSpot> spots;
+  final Color color;
   final TimeRange timeRange;
-  final Color lineColor;
-  final Color fillColor;
 
-  const _TrendChart({
+  const _MiniTrendChart({
     required this.spots,
+    required this.color,
     required this.timeRange,
-    required this.lineColor,
-    required this.fillColor,
   });
 
-  String _intervalLabel(TimeRange tr) {
-    switch (tr) {
+  double get _maxX {
+    switch (timeRange) {
       case TimeRange.daily:
-        return 'óra';
+        return 23;
       case TimeRange.weekly:
-        return 'nap';
+        return 7;
       case TimeRange.monthly:
-        return 'nap';
+        return 30;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 240,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          )
-        ],
-      ),
-      child: LineChart(
-        LineChartData(
-          minY: 0,
-          maxY: 30,
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            horizontalInterval: 6,
-            getDrawingHorizontalLine: (_) =>
-                const FlLine(color: Color(0xFFF0F0F0), strokeWidth: 1),
-          ),
-          borderData: FlBorderData(show: false),
-          titlesData: FlTitlesData(
-            rightTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: 6,
-                reservedSize: 32,
-                getTitlesWidget: (v, _) => Text(
-                  v.toInt().toString(),
-                  style: const TextStyle(
-                      fontSize: 11, color: AppTheme.textSecondary),
-                ),
-              ),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: timeRange == TimeRange.daily ? 3 : 1,
-                getTitlesWidget: (v, _) {
-                  if (timeRange == TimeRange.daily) {
-                    return Text(
-                      '${(v.toInt()) % 24}:00',
-                      style: const TextStyle(
-                          fontSize: 10, color: AppTheme.textSecondary),
-                    );
-                  }
-                  return Text(
-                    '${v.toInt() + 1}. nap',
-                    style: const TextStyle(
-                        fontSize: 10, color: AppTheme.textSecondary),
-                  );
-                },
-              ),
-            ),
-          ),
-          lineBarsData: [
-            LineChartBarData(
-              spots: spots,
-              isCurved: true,
-              color: lineColor,
-              barWidth: 2.5,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(show: true, color: fillColor),
-            ),
-          ],
+    final safeSpots = spots.isEmpty ? [const FlSpot(0, 0)] : spots;
+
+    final dataMinY = safeSpots.map((e) => e.y).reduce((a, b) => a < b ? a : b);
+    final dataMaxY = safeSpots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
+
+    final padding = ((dataMaxY - dataMinY).abs() * 0.15).clamp(1.0, 10.0);
+
+    final minY = dataMinY == dataMaxY ? dataMinY - 1 : dataMinY - padding;
+    final maxY = dataMinY == dataMaxY ? dataMaxY + 1 : dataMaxY + padding;
+
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: _maxX,
+        minY: minY,
+        maxY: maxY,
+        gridData: const FlGridData(show: false),
+        borderData: FlBorderData(show: false),
+        titlesData: const FlTitlesData(
+          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
+        lineTouchData: const LineTouchData(enabled: false),
+        lineBarsData: [
+          LineChartBarData(
+            spots: safeSpots,
+            isCurved: true,
+            color: color,
+            barWidth: 2,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              color: color.withOpacity(0.08),
+            ),
+          ),
+        ],
       ),
     );
   }
