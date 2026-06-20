@@ -376,7 +376,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 1.15,
+                childAspectRatio: cols == 1 ? 1.25 : 1.05,
                 children: [
                   _StatCard(
                     title: 'Hőmérséklet',
@@ -387,6 +387,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     avg: '${tempStats.avg.toStringAsFixed(1)}°C',
                     spots: _tempSpots,
                     timeRange: _timeRange,
+                    unit: '°C',
                   ),
                   _StatCard(
                     title: 'Páratartalom',
@@ -397,6 +398,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     avg: '${humidityStats.avg.toStringAsFixed(1)}%',
                     spots: _humiditySpots,
                     timeRange: _timeRange,
+                    unit: '%',
                   ),
                   _StatCard(
                     title: 'Talajnedvesség',
@@ -407,6 +409,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     avg: '${soilStats.avg.toStringAsFixed(1)}%',
                     spots: _soilSpots,
                     timeRange: _timeRange,
+                    unit: '%',
                   ),
                   _StatCard(
                     title: 'Fényerő',
@@ -417,6 +420,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     avg: '${lightStats.avg.toInt()} lux',
                     spots: _lightSpots,
                     timeRange: _timeRange,
+                    unit: 'lux',
                   ),
                 ],
               );
@@ -493,6 +497,7 @@ class _StatCard extends StatelessWidget {
   final String avg;
   final List<FlSpot> spots;
   final TimeRange timeRange;
+  final String unit;
 
   const _StatCard({
     required this.title,
@@ -503,6 +508,7 @@ class _StatCard extends StatelessWidget {
     required this.avg,
     required this.spots,
     required this.timeRange,
+    required this.unit,
   });
 
   @override
@@ -626,6 +632,7 @@ class _StatCard extends StatelessWidget {
               spots: spots,
               color: color,
               timeRange: timeRange,
+              unit: unit,
             ),
           ),
         ],
@@ -638,22 +645,60 @@ class _MiniTrendChart extends StatelessWidget {
   final List<FlSpot> spots;
   final Color color;
   final TimeRange timeRange;
+  final String unit;
 
   const _MiniTrendChart({
     required this.spots,
     required this.color,
     required this.timeRange,
+    required this.unit,
   });
 
   double get _maxX {
     switch (timeRange) {
       case TimeRange.daily:
-        return 23;
+        return 24;
       case TimeRange.weekly:
         return 7;
       case TimeRange.monthly:
         return 30;
     }
+  }
+
+  double get _bottomInterval {
+    switch (timeRange) {
+      case TimeRange.daily:
+        return 6;
+      case TimeRange.weekly:
+        return 1;
+      case TimeRange.monthly:
+        return 10;
+    }
+  }
+
+  String _bottomLabel(double value) {
+    final v = value.round();
+
+    switch (timeRange) {
+      case TimeRange.daily:
+        return '${v.toString().padLeft(2, '0')}h';
+      case TimeRange.weekly:
+        return '${v}n';
+      case TimeRange.monthly:
+        return '${v}n';
+    }
+  }
+
+  String _formatY(double value) {
+    if (unit == 'lux') {
+      return value.toInt().toString();
+    }
+
+    if (value.abs() >= 100) {
+      return value.toInt().toString();
+    }
+
+    return value.toStringAsFixed(1);
   }
 
   @override
@@ -663,10 +708,16 @@ class _MiniTrendChart extends StatelessWidget {
     final dataMinY = safeSpots.map((e) => e.y).reduce((a, b) => a < b ? a : b);
     final dataMaxY = safeSpots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
 
-    final padding = ((dataMaxY - dataMinY).abs() * 0.15).clamp(1.0, 10.0);
+    final range = (dataMaxY - dataMinY).abs();
 
-    final minY = dataMinY == dataMaxY ? dataMinY - 1 : dataMinY - padding;
-    final maxY = dataMinY == dataMaxY ? dataMaxY + 1 : dataMaxY + padding;
+    final padding = range == 0
+        ? 2.0
+        : (range * 0.18).clamp(2.0, unit == 'lux' ? 1000.0 : 10.0);
+
+    final minY = dataMinY - padding;
+    final maxY = dataMaxY + padding;
+
+    final yInterval = ((maxY - minY) / 2).abs();
 
     return LineChart(
       LineChartData(
@@ -674,13 +725,94 @@ class _MiniTrendChart extends StatelessWidget {
         maxX: _maxX,
         minY: minY,
         maxY: maxY,
-        gridData: const FlGridData(show: false),
-        borderData: FlBorderData(show: false),
-        titlesData: const FlTitlesData(
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: yInterval == 0 ? 1 : yInterval,
+          getDrawingHorizontalLine: (value) {
+            return FlLine(
+              color: AppTheme.border.withOpacity(0.6),
+              strokeWidth: 1,
+            );
+          },
+        ),
+        borderData: FlBorderData(
+          show: true,
+          border: Border(
+            left: BorderSide(color: AppTheme.border.withOpacity(0.8)),
+            bottom: BorderSide(color: AppTheme.border.withOpacity(0.8)),
+          ),
+        ),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: unit == 'lux' ? 42 : 34,
+              interval: yInterval == 0 ? 1 : yInterval,
+              getTitlesWidget: (value, meta) {
+                final isMin = (value - minY).abs() < yInterval * 0.25;
+                final isMid =
+                    (value - ((minY + maxY) / 2)).abs() < yInterval * 0.25;
+                final isMax = (value - maxY).abs() < yInterval * 0.25;
+
+                if (!isMin && !isMid && !isMax) {
+                  return const SizedBox.shrink();
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Text(
+                    _formatY(value),
+                    style: const TextStyle(
+                      fontSize: 9,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 22,
+              interval: _bottomInterval,
+              getTitlesWidget: (value, meta) {
+                if (value < 0 || value > _maxX) {
+                  return const SizedBox.shrink();
+                }
+
+                final rounded = value.round();
+
+                if ((value - rounded).abs() > 0.01) {
+                  return const SizedBox.shrink();
+                }
+
+                if (timeRange == TimeRange.daily && rounded == 24) {
+                  return const SizedBox.shrink();
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    _bottomLabel(value),
+                    style: const TextStyle(
+                      fontSize: 9,
+                      color: AppTheme.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         ),
         lineTouchData: const LineTouchData(enabled: false),
         lineBarsData: [
