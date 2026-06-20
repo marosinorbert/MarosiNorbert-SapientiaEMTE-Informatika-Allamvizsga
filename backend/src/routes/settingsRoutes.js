@@ -61,6 +61,18 @@ RETURNING *
     ]
   );
 
+  await pool.query(
+    `
+  INSERT INTO system_logs (type, title, description)
+  VALUES ($1, $2, $3)
+  `,
+    [
+      'system',
+      'Beállítások módosítva',
+      'Az automata vezérléshez használt határértékek frissítve lettek.',
+    ]
+  );
+
   res.json(result.rows[0]);
 });
 
