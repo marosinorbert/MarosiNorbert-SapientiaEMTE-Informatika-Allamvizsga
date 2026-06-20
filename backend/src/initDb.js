@@ -199,6 +199,46 @@ CREATE TABLE IF NOT EXISTS alerts (
   );
 `);
 
+  await pool.query(`
+  CREATE TABLE IF NOT EXISTS plants (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    species VARCHAR(150) DEFAULT 'Ismeretlen fajta',
+    emoji VARCHAR(10) DEFAULT '🌱',
+    planted_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    temp_min NUMERIC(5,2) DEFAULT 18,
+    temp_max NUMERIC(5,2) DEFAULT 28,
+
+    humidity_min NUMERIC(5,2) DEFAULT 50,
+    humidity_max NUMERIC(5,2) DEFAULT 75,
+
+    soil_min NUMERIC(5,2) DEFAULT 35,
+    soil_max NUMERIC(5,2) DEFAULT 80,
+
+    light_min NUMERIC(8,2) DEFAULT 800,
+    light_max NUMERIC(8,2) DEFAULT 3000,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+  await pool.query(`
+  ALTER TABLE plants
+  ADD COLUMN IF NOT EXISTS species VARCHAR(150) DEFAULT 'Ismeretlen fajta';
+`);
+
+  await pool.query(`
+  ALTER TABLE plants
+  ADD COLUMN IF NOT EXISTS emoji VARCHAR(10) DEFAULT '🌱';
+`);
+
+  await pool.query(`
+  ALTER TABLE plants
+  ADD COLUMN IF NOT EXISTS planted_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+`);
+
   console.log('Database initialized');
 }
 

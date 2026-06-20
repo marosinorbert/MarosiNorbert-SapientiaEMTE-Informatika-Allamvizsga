@@ -238,4 +238,99 @@ class ApiService {
       throw Exception('Nem sikerült törölni a riasztásokat');
     }
   }
+
+  static Future<List<dynamic>> getPlants() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/plants'),
+      headers: headers,
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+
+    throw Exception('Nem sikerült lekérni a növényeket');
+  }
+
+  static Future<void> addPlant({
+    required String name,
+    required String species,
+    required String emoji,
+    required double tempMin,
+    required double tempMax,
+    required double humidityMin,
+    required double humidityMax,
+    required double soilMin,
+    required double soilMax,
+    required double lightMin,
+    required double lightMax,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/plants'),
+      headers: headers,
+      body: jsonEncode({
+        'name': name,
+        'species': species,
+        'emoji': emoji,
+        'tempMin': tempMin,
+        'tempMax': tempMax,
+        'humidityMin': humidityMin,
+        'humidityMax': humidityMax,
+        'soilMin': soilMin,
+        'soilMax': soilMax,
+        'lightMin': lightMin,
+        'lightMax': lightMax,
+      }),
+    );
+
+    if (response.statusCode != 201) {
+      throw Exception('Nem sikerült létrehozni a növényt');
+    }
+  }
+
+  static Future<void> deletePlant(int id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/plants/$id'),
+      headers: headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Nem sikerült törölni a növényt');
+    }
+  }
+
+  static Future<void> updatePlant({
+    required int id,
+    required String name,
+    required String species,
+    required String emoji,
+    required double tempMin,
+    required double tempMax,
+    required double humidityMin,
+    required double humidityMax,
+    required double soilMin,
+    required double soilMax,
+    required double lightMin,
+    required double lightMax,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/plants/$id'),
+      headers: headers,
+      body: jsonEncode({
+        'name': name,
+        'tempMin': tempMin,
+        'tempMax': tempMax,
+        'humidityMin': humidityMin,
+        'humidityMax': humidityMax,
+        'soilMin': soilMin,
+        'soilMax': soilMax,
+        'lightMin': lightMin,
+        'lightMax': lightMax,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Nem sikerült módosítani a növényt');
+    }
+  }
 }
