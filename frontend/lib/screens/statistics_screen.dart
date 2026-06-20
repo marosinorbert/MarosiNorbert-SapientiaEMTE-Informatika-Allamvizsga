@@ -39,6 +39,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
   bool _isLoading = true;
   String? _error;
+  bool _hasNoDevice = false;
 
   _SensorStats _tempStats = _SensorStats(min: 0, max: 0, avg: 0);
   _SensorStats _humidityStats = _SensorStats(min: 0, max: 0, avg: 0);
@@ -183,16 +184,41 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadStatistics();
+    _loadStatistics(showLoading: true);
   }
 
-  Future<void> _loadStatistics() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
+  Future<void> _loadStatistics({bool showLoading = false}) async {
     try {
+      if (showLoading && mounted) {
+        setState(() {
+          _isLoading = true;
+          _error = null;
+        });
+      }
+
+      final hasDevice = await ApiService.hasClaimedDevice();
+
+      if (!mounted) return;
+
+      if (!hasDevice) {
+        setState(() {
+          _hasNoDevice = true;
+          _isLoading = false;
+          _error = null;
+
+          _tempStats = _SensorStats(min: 0, max: 0, avg: 0);
+          _humidityStats = _SensorStats(min: 0, max: 0, avg: 0);
+          _soilStats = _SensorStats(min: 0, max: 0, avg: 0);
+          _lightStats = _SensorStats(min: 0, max: 0, avg: 0);
+
+          _tempSpots = [];
+          _humiditySpots = [];
+          _soilSpots = [];
+          _lightSpots = [];
+        });
+        return;
+      }
+
       List<dynamic> history;
 
       if (_timeRange == TimeRange.daily) {
@@ -262,7 +288,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         ),
       );
 
+      if (!mounted) return;
+
       setState(() {
+        _hasNoDevice = false;
+        _error = null;
+
         _tempStats = calculateStats(temperatures);
         _humidityStats = calculateStats(humidities);
         _soilStats = calculateStats(soilValues);
@@ -276,9 +307,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         _error = 'Nem sikerült betölteni a statisztikákat: $e';
         _isLoading = false;
+        _hasNoDevice = false;
       });
     }
   }
@@ -289,8 +323,26 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    if (_hasNoDevice) {
+      return _NoDeviceStatisticsCard(
+        onRefresh: () => _loadStatistics(showLoading: true),
+      );
+    }
+
     if (_error != null) {
-      return Center(child: Text(_error!));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      );
     }
     final tempStats = _tempStats;
     final humidityStats = _humidityStats;
@@ -346,7 +398,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                           isSelected: _timeRange == tr,
                           onTap: () {
                             setState(() => _timeRange = tr);
-                            _loadStatistics();
+                            _loadStatistics(showLoading: true);
                           },
                         ),
                       ))
@@ -441,6 +493,97 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           const SizedBox(height: 14),
           _DeviceStatsTable(devices: _deviceStats),
         ],
+      ),
+    );
+  }
+}
+
+class _NoDeviceStatisticsCard extends StatelessWidget {
+  final VoidCallback onRefresh;
+
+  const _NoDeviceStatisticsCard({
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 560),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppTheme.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryLight,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(
+                  Icons.query_stats_rounded,
+                  color: AppTheme.primary,
+                  size: 34,
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Nincs ESP32 hozzárendelve',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'A statisztikák megjelenítéséhez először rendelj hozzá '
+                'egy ESP32 eszközt a Beállítások oldalon. Ezután a rendszer '
+                'a saját szenzoradataidból számolja a napi, heti és havi értékeket.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.45,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Újraellenőrzés'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

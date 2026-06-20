@@ -14,19 +14,43 @@ class SensorsScreen extends StatefulWidget {
 class _SensorsScreenState extends State<SensorsScreen> {
   bool _isLoading = true;
   String? _error;
+  bool _hasNoDevice = false;
 
   List<_SensorInfo> _sensors = [];
 
   List<FlSpot> _tempSpots = [];
   List<FlSpot> _soilSpots = [];
+
   @override
   void initState() {
     super.initState();
-    _loadSensorData();
+    _loadSensorData(showLoading: true);
   }
 
-  Future<void> _loadSensorData() async {
+  Future<void> _loadSensorData({bool showLoading = false}) async {
     try {
+      if (showLoading && mounted) {
+        setState(() {
+          _isLoading = true;
+          _error = null;
+        });
+      }
+
+      final hasDevice = await ApiService.hasClaimedDevice();
+
+      if (!mounted) return;
+
+      if (!hasDevice) {
+        setState(() {
+          _hasNoDevice = true;
+          _isLoading = false;
+          _error = null;
+          _sensors = [];
+          _tempSpots = [];
+          _soilSpots = [];
+        });
+        return;
+      }
       final latestJson = await ApiService.getLatestSensorData();
       final historyJson = await ApiService.getSensorHistory(
         hours: 24,
@@ -122,11 +146,16 @@ class _SensorsScreenState extends State<SensorsScreen> {
         _soilSpots = soilSpots;
 
         _isLoading = false;
+        _hasNoDevice = false;
+        _error = null;
       });
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         _error = 'Nem sikerült betölteni a szenzoradatokat: $e';
         _isLoading = false;
+        _hasNoDevice = false;
       });
     }
   }
@@ -139,9 +168,25 @@ class _SensorsScreenState extends State<SensorsScreen> {
       );
     }
 
+    if (_hasNoDevice) {
+      return _NoDeviceSensorsCard(
+        onRefresh: () => _loadSensorData(showLoading: true),
+      );
+    }
+
     if (_error != null) {
       return Center(
-        child: Text(_error!),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+        ),
       );
     }
 
@@ -352,6 +397,97 @@ class _SensorsScreenState extends State<SensorsScreen> {
               belowBarData: BarAreaData(show: true, color: fillColor),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoDeviceSensorsCard extends StatelessWidget {
+  final VoidCallback onRefresh;
+
+  const _NoDeviceSensorsCard({
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 560),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppTheme.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryLight,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(
+                  Icons.sensors_rounded,
+                  color: AppTheme.primary,
+                  size: 34,
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Nincs ESP32 hozzárendelve',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'A szenzorok aktuális értékeinek és 24 órás trendjeinek '
+                'megjelenítéséhez először rendelj hozzá egy ESP32 eszközt '
+                'a Beállítások oldalon.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.45,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Újraellenőrzés'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

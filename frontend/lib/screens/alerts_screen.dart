@@ -56,14 +56,40 @@ class _AlertsScreenState extends State<AlertsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadAlerts();
+    _loadAlerts(showLoading: true);
   }
 
-  Future<void> _loadAlerts() async {
+  Future<void> _loadAlerts({bool showLoading = false}) async {
     try {
+      if (showLoading && mounted) {
+        setState(() {
+          _isLoading = true;
+          _error = null;
+        });
+      }
+
+      final hasDevice = await ApiService.hasClaimedDevice();
+
+      if (!mounted) return;
+
+      if (!hasDevice) {
+        setState(() {
+          _hasNoDevice = true;
+          _alerts = [];
+          _isLoading = false;
+          _error = null;
+        });
+        return;
+      }
+
       final alerts = await ApiService.getAlerts();
 
+      if (!mounted) return;
+
       setState(() {
+        _hasNoDevice = false;
+        _error = null;
+
         _alerts = alerts.map<AlertEntry>((a) {
           return AlertEntry(
             id: a['id'],
@@ -79,9 +105,12 @@ class _AlertsScreenState extends State<AlertsScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
-        _error = e.toString();
+        _error = 'Nem sikerült betölteni a riasztásokat: $e';
         _isLoading = false;
+        _hasNoDevice = false;
       });
     }
   }
@@ -101,6 +130,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
 
   bool _isLoading = true;
   String? _error;
+  bool _hasNoDevice = false;
 
   final List<AlertRule> _rules = [
     AlertRule(
@@ -142,8 +172,16 @@ class _AlertsScreenState extends State<AlertsScreen> {
   ];
 
   Future<void> _acknowledge(int id) async {
-    await ApiService.acknowledgeAlert(id);
-    await _loadAlerts();
+    try {
+      await ApiService.acknowledgeAlert(id);
+      await _loadAlerts();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Nem sikerült nyugtázni a riasztást: $e')),
+      );
+    }
   }
 
   Future<void> _dismiss(int id) async {
@@ -219,9 +257,25 @@ class _AlertsScreenState extends State<AlertsScreen> {
       );
     }
 
+    if (_hasNoDevice) {
+      return _NoDeviceAlertsCard(
+        onRefresh: () => _loadAlerts(showLoading: true),
+      );
+    }
+
     if (_error != null) {
       return Center(
-        child: Text(_error!),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+        ),
       );
     }
 
@@ -318,6 +372,99 @@ class _AlertsScreenState extends State<AlertsScreen> {
 
           const SizedBox(height: 28),
         ],
+      ),
+    );
+  }
+}
+
+class _NoDeviceAlertsCard extends StatelessWidget {
+  final VoidCallback onRefresh;
+
+  const _NoDeviceAlertsCard({
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 560),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppTheme.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryLight,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(
+                  Icons.notifications_active_rounded,
+                  color: AppTheme.primary,
+                  size: 34,
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Nincs ESP32 hozzárendelve',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'A riasztások a saját ESP32 eszköz szenzoradatai alapján '
+                'jönnek létre. Először rendelj hozzá egy ESP32-t a '
+                'Beállítások oldalon, majd a rendszer itt fogja megjeleníteni '
+                'a hőmérséklet, páratartalom, talajnedvesség és víztartály '
+                'riasztásokat.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.45,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Újraellenőrzés'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

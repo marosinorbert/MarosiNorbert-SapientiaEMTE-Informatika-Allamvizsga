@@ -75,6 +75,7 @@ class _PlantsScreenState extends State<PlantsScreen> {
   double _currentLight = 0;
 
   bool _isLoading = true;
+  bool _hasDevice = false;
 
   List<Plant> _plants = [];
 
@@ -92,14 +93,25 @@ class _PlantsScreenState extends State<PlantsScreen> {
   }
 
   Future<void> _loadData() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    final hasDevice = await ApiService.hasClaimedDevice();
+
+    if (!mounted) return;
+
     setState(() {
-      _isLoading = true;
+      _hasDevice = hasDevice;
     });
 
-    await Future.wait([
-      _loadCurrentSensorData(),
-      _loadPlants(),
-    ]);
+    await _loadPlants();
+
+    if (hasDevice) {
+      await _loadCurrentSensorData();
+    }
 
     if (!mounted) return;
 
@@ -146,7 +158,9 @@ class _PlantsScreenState extends State<PlantsScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      setState(() {});
+      setState(() {
+        _hasDevice = false;
+      });
     }
   }
 
@@ -177,15 +191,26 @@ class _PlantsScreenState extends State<PlantsScreen> {
     return '$diff nap';
   }
 
-  bool _tempOk(Plant p) =>
-      _currentTemp >= p.idealTempMin && _currentTemp <= p.idealTempMax;
-  bool _humidityOk(Plant p) =>
-      _currentHumidity >= p.idealHumidityMin &&
-      _currentHumidity <= p.idealHumidityMax;
-  bool _soilOk(Plant p) =>
-      _currentSoil >= p.idealSoilMin && _currentSoil <= p.idealSoilMax;
-  bool _lightOk(Plant p) =>
-      _currentLight >= p.idealLightMin && _currentLight <= p.idealLightMax;
+  bool _tempOk(Plant p) {
+    if (!_hasDevice) return false;
+    return _currentTemp >= p.idealTempMin && _currentTemp <= p.idealTempMax;
+  }
+
+  bool _humidityOk(Plant p) {
+    if (!_hasDevice) return false;
+    return _currentHumidity >= p.idealHumidityMin &&
+        _currentHumidity <= p.idealHumidityMax;
+  }
+
+  bool _soilOk(Plant p) {
+    if (!_hasDevice) return false;
+    return _currentSoil >= p.idealSoilMin && _currentSoil <= p.idealSoilMax;
+  }
+
+  bool _lightOk(Plant p) {
+    if (!_hasDevice) return false;
+    return _currentLight >= p.idealLightMin && _currentLight <= p.idealLightMax;
+  }
 
   int _healthScore(Plant p) {
     int score = 0;
@@ -197,12 +222,14 @@ class _PlantsScreenState extends State<PlantsScreen> {
   }
 
   Color _healthColor(int score) {
+    if (!_hasDevice) return AppTheme.textSecondary;
     if (score == 4) return AppTheme.primary;
     if (score >= 2) return const Color(0xFFF59E0B);
     return const Color(0xFFEF4444);
   }
 
   String _healthLabel(int score) {
+    if (!_hasDevice) return 'Nincs mérés';
     if (score == 4) return 'Kiváló';
     if (score >= 2) return 'Közepes';
     return 'Kritikus';
@@ -585,50 +612,53 @@ class _PlantsScreenState extends State<PlantsScreen> {
           const SizedBox(height: 20),
 
           // Current sensor summary banner
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryLight,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
-            ),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                const Icon(
-                  Icons.sensors_rounded,
-                  color: AppTheme.primary,
-                  size: 18,
-                ),
-                const Text(
-                  'Aktuális értékek:',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+          if (_hasDevice)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
+              ),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.sensors_rounded,
                     color: AppTheme.primary,
+                    size: 18,
                   ),
-                ),
-                _SensorBadge(
-                  label: '${_currentTemp.toStringAsFixed(1)}°C',
-                  icon: Icons.thermostat_rounded,
-                ),
-                _SensorBadge(
-                  label: '${_currentHumidity.toStringAsFixed(1)}%',
-                  icon: Icons.water_drop_rounded,
-                ),
-                _SensorBadge(
-                  label: '${_currentSoil.toStringAsFixed(1)}%',
-                  icon: Icons.eco_rounded,
-                ),
-                _SensorBadge(
-                  label: '${_currentLight.toInt()} lux',
-                  icon: Icons.wb_sunny_rounded,
-                ),
-              ],
-            ),
-          ),
+                  const Text(
+                    'Aktuális értékek:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                  _SensorBadge(
+                    label: '${_currentTemp.toStringAsFixed(1)}°C',
+                    icon: Icons.thermostat_rounded,
+                  ),
+                  _SensorBadge(
+                    label: '${_currentHumidity.toStringAsFixed(1)}%',
+                    icon: Icons.water_drop_rounded,
+                  ),
+                  _SensorBadge(
+                    label: '${_currentSoil.toStringAsFixed(1)}%',
+                    icon: Icons.eco_rounded,
+                  ),
+                  _SensorBadge(
+                    label: '${_currentLight.toInt()} lux',
+                    icon: Icons.wb_sunny_rounded,
+                  ),
+                ],
+              ),
+            )
+          else
+            const _NoDevicePlantsBanner(),
 
           const SizedBox(height: 24),
 
@@ -653,6 +683,7 @@ class _PlantsScreenState extends State<PlantsScreen> {
                   children: _plants
                       .map((p) => _PlantCard(
                             plant: p,
+                            hasDevice: _hasDevice,
                             tempOk: _tempOk(p),
                             humidityOk: _humidityOk(p),
                             soilOk: _soilOk(p),
@@ -678,10 +709,53 @@ class _PlantsScreenState extends State<PlantsScreen> {
   }
 }
 
+class _NoDevicePlantsBanner extends StatelessWidget {
+  const _NoDevicePlantsBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.primary.withOpacity(0.3)),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.sensors_off_rounded,
+            color: AppTheme.primary,
+            size: 20,
+          ),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Nincs ESP32 hozzárendelve ehhez a fiókhoz. '
+              'Növényeket így is hozzáadhatsz és szerkeszthetsz, '
+              'de az állapotértékeléshez először rendelj hozzá egy ESP32-t '
+              'a Beállítások oldalon.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                color: AppTheme.primary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Plant Card ───────────────────────────────────────────
 
 class _PlantCard extends StatelessWidget {
   final Plant plant;
+  final bool hasDevice;
   final bool tempOk;
   final bool humidityOk;
   final bool soilOk;
@@ -699,6 +773,7 @@ class _PlantCard extends StatelessWidget {
 
   const _PlantCard({
     required this.plant,
+    required this.hasDevice,
     required this.tempOk,
     required this.humidityOk,
     required this.soilOk,
@@ -795,7 +870,7 @@ class _PlantCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$healthScore/4',
+                      hasDevice ? '$healthScore/4' : '-',
                       style: TextStyle(
                         fontSize: 11,
                         color: healthColor,
@@ -820,6 +895,7 @@ class _PlantCard extends StatelessWidget {
                     current: '${currentTemp}°C',
                     ideal: '${plant.idealTempMin}–${plant.idealTempMax}°C',
                     isOk: tempOk,
+                    hasMeasurement: hasDevice,
                   ),
                   const SizedBox(height: 8),
                   _CompareRow(
@@ -829,6 +905,7 @@ class _PlantCard extends StatelessWidget {
                     ideal:
                         '${plant.idealHumidityMin.toInt()}–${plant.idealHumidityMax.toInt()}%',
                     isOk: humidityOk,
+                    hasMeasurement: hasDevice,
                   ),
                   const SizedBox(height: 8),
                   _CompareRow(
@@ -838,6 +915,7 @@ class _PlantCard extends StatelessWidget {
                     ideal:
                         '${plant.idealSoilMin.toInt()}–${plant.idealSoilMax.toInt()}%',
                     isOk: soilOk,
+                    hasMeasurement: hasDevice,
                   ),
                   const SizedBox(height: 8),
                   _CompareRow(
@@ -847,6 +925,7 @@ class _PlantCard extends StatelessWidget {
                     ideal:
                         '${plant.idealLightMin.toInt()}–${plant.idealLightMax.toInt()} lux',
                     isOk: lightOk,
+                    hasMeasurement: hasDevice,
                   ),
                 ],
               ),
@@ -931,6 +1010,7 @@ class _CompareRow extends StatelessWidget {
   final String current;
   final String ideal;
   final bool isOk;
+  final bool hasMeasurement;
 
   const _CompareRow({
     required this.icon,
@@ -938,11 +1018,16 @@ class _CompareRow extends StatelessWidget {
     required this.current,
     required this.ideal,
     required this.isOk,
+    required this.hasMeasurement,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = isOk ? AppTheme.primary : const Color(0xFFEF4444);
+    final color = !hasMeasurement
+        ? AppTheme.textSecondary
+        : isOk
+            ? AppTheme.primary
+            : const Color(0xFFEF4444);
     return Row(
       children: [
         Icon(icon, size: 14, color: AppTheme.textSecondary),
@@ -962,7 +1047,11 @@ class _CompareRow extends StatelessWidget {
         ),
         const SizedBox(width: 4),
         Icon(
-          isOk ? Icons.check_circle_rounded : Icons.cancel_rounded,
+          !hasMeasurement
+              ? Icons.info_outline_rounded
+              : isOk
+                  ? Icons.check_circle_rounded
+                  : Icons.cancel_rounded,
           size: 14,
           color: color,
         ),

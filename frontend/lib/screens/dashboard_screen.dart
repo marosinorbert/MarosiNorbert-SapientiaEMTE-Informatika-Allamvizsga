@@ -16,6 +16,96 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
+class _NoDeviceDashboardCard extends StatelessWidget {
+  final VoidCallback onRefresh;
+
+  const _NoDeviceDashboardCard({
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 560),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppTheme.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryLight,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(
+                  Icons.sensors_rounded,
+                  color: AppTheme.primary,
+                  size: 34,
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Nincs ESP32 hozzárendelve',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'A szenzoradatok, grafikonok és eszközvezérlés megjelenítéséhez '
+                'először rendelj hozzá egy ESP32 eszközt a Beállítások oldalon.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.45,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Újraellenőrzés'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _DashboardScreenState extends State<DashboardScreen> {
   double _tempMin = 18;
   double _tempMax = 28;
@@ -49,6 +139,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool _isLoading = true;
   String? _error;
+  bool _hasNoDevice = false;
 
   List<FlSpot> _tempSpots = [];
   List<FlSpot> _humiditySpots = [];
@@ -58,11 +149,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSensorData();
+    _loadSensorData(showLoading: true);
 
     _refreshTimer = Timer.periodic(
       const Duration(seconds: 5),
-      (_) => _loadSensorData(),
+      (_) {
+        if (mounted) {
+          _loadSensorData();
+        }
+      },
     );
   }
 
@@ -72,8 +167,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  Future<void> _loadSensorData() async {
+  Future<void> _loadSensorData({bool showLoading = false}) async {
     try {
+      if (showLoading && mounted) {
+        setState(() {
+          _isLoading = true;
+          _error = null;
+        });
+      }
+
+      final hasDevice = await ApiService.hasClaimedDevice();
+
+      if (!mounted) return;
+
+      if (!hasDevice) {
+        setState(() {
+          _hasNoDevice = true;
+          _isLoading = false;
+          _error = null;
+          _tempSpots = [];
+          _humiditySpots = [];
+        });
+        return;
+      }
+
       final latestJson = await ApiService.getLatestSensorData();
       final historyJson = await ApiService.getSensorHistory(today: true);
       final devicesJson = await ApiService.getDevices();
@@ -106,28 +223,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final isAuto = deviceJson['is_auto'] ?? false;
 
         if (deviceName == 'pump') {
-          _devices.firstWhere((d) => d.name == 'Öntözőrendszer').isOn = isOn;
-          _devices.firstWhere((d) => d.name == 'Öntözőrendszer').isAuto =
-              isAuto;
+          final device = _devices.firstWhere((d) => d.name == 'Öntözőrendszer');
+          device.isOn = isOn;
+          device.isAuto = isAuto;
         }
 
         if (deviceName == 'light') {
-          _devices.firstWhere((d) => d.name == 'Növénylámpa').isOn = isOn;
-          _devices.firstWhere((d) => d.name == 'Növénylámpa').isAuto = isAuto;
+          final device = _devices.firstWhere((d) => d.name == 'Növénylámpa');
+          device.isOn = isOn;
+          device.isAuto = isAuto;
         }
 
         if (deviceName == 'fan') {
-          _devices.firstWhere((d) => d.name == 'Szellőzés').isOn = isOn;
-          _devices.firstWhere((d) => d.name == 'Szellőzés').isAuto = isAuto;
+          final device = _devices.firstWhere((d) => d.name == 'Szellőzés');
+          device.isOn = isOn;
+          device.isAuto = isAuto;
         }
 
         if (deviceName == 'heater') {
-          _devices.firstWhere((d) => d.name == 'Fűtés').isOn = isOn;
-          _devices.firstWhere((d) => d.name == 'Fűtés').isAuto = isAuto;
+          final device = _devices.firstWhere((d) => d.name == 'Fűtés');
+          device.isOn = isOn;
+          device.isAuto = isAuto;
         }
       }
 
+      if (!mounted) return;
+
       setState(() {
+        _hasNoDevice = false;
+        _error = null;
+
         _tempMin = _toDouble(settingsJson['temp_min'], 18);
         _tempMax = _toDouble(settingsJson['temp_max'], 28);
 
@@ -153,9 +278,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         _error = 'Nem sikerült betölteni az adatokat: $e';
         _isLoading = false;
+        _hasNoDevice = false;
       });
     }
   }
@@ -211,9 +339,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
+    if (_hasNoDevice) {
+      return _NoDeviceDashboardCard(
+        onRefresh: () => _loadSensorData(showLoading: true),
+      );
+    }
+
     if (_error != null) {
       return Center(
-        child: Text(_error!),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+        ),
       );
     }
 
