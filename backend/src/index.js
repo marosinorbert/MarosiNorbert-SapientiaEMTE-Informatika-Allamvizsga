@@ -11,6 +11,7 @@ const esp32Routes = require('./routes/esp32Routes');
 const alertRoutes = require('./routes/alertRoutes');
 const logRoutes = require('./routes/logRoutes');
 const plantRoutes = require('./routes/plantRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 app.use(cors({
   origin: true,
@@ -29,6 +30,7 @@ app.use('/api/esp32', esp32Routes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/logs', logRoutes);
 app.use('/api/plants', plantRoutes);
+app.use('/api/auth', authRoutes);
 app.get('/', async (req, res) => {
   const result = await pool.query('SELECT NOW()');
   res.json({

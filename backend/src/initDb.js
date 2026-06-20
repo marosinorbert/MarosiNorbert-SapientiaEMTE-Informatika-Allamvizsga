@@ -29,6 +29,33 @@ async function initDb() {
 `);
 
   await pool.query(`
+  CREATE TABLE IF NOT EXISTS greenhouse_devices (
+    id SERIAL PRIMARY KEY,
+    device_name VARCHAR(100) DEFAULT 'Okos melegház',
+    claim_code VARCHAR(50) UNIQUE NOT NULL,
+    device_token TEXT UNIQUE NOT NULL,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    is_claimed BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    claimed_at TIMESTAMP
+  );
+`);
+
+  await pool.query(`
+  INSERT INTO greenhouse_devices (
+    device_name,
+    claim_code,
+    device_token
+  )
+  VALUES (
+    'ESP32-S3 Okos melegház',
+    'GH-001-A7K9',
+    'esp32_device_token_gh_001_a7k9_2026'
+  )
+  ON CONFLICT (claim_code) DO NOTHING;
+`);
+
+  await pool.query(`
   ALTER TABLE device_state
   ADD COLUMN IF NOT EXISTS is_auto BOOLEAN DEFAULT TRUE;
 `);
@@ -110,6 +137,16 @@ async function initDb() {
     light_max NUMERIC(8,2) DEFAULT 3000,
 
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+  await pool.query(`
+  CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
