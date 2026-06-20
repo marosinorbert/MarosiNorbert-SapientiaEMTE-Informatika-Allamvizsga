@@ -128,6 +128,18 @@ RETURNING *
         `,
         [title, message, severity, sensor]
       );
+
+      await pool.query(
+        `
+        INSERT INTO system_logs (type, title, description)
+        VALUES ($1, $2, $3)
+        `,
+        [
+          'alert',
+          title,
+          message,
+        ]
+      );
     }
   }
 
