@@ -683,9 +683,9 @@ class _MiniTrendChart extends StatelessWidget {
       case TimeRange.daily:
         return '${v.toString().padLeft(2, '0')}h';
       case TimeRange.weekly:
-        return '${v}n';
+        return '${v}';
       case TimeRange.monthly:
-        return '${v}n';
+        return '${v}';
     }
   }
 

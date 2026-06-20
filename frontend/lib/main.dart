@@ -17,18 +17,24 @@ void main() {
   runApp(const SmartGreenhouseApp());
 }
 
-
-
 class SmartGreenhouseApp extends StatelessWidget {
   const SmartGreenhouseApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Smart Greenhouse',
-      theme: AppTheme.theme,
-      debugShowCheckedModeBanner: false,
-home: const SplashScreen(),    );
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppSettingsController.themeMode,
+      builder: (context, themeMode, _) {
+        return MaterialApp(
+          title: 'Smart Greenhouse',
+          theme: AppTheme.theme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeMode,
+          debugShowCheckedModeBanner: false,
+          home: const SplashScreen(),
+        );
+      },
+    );
   }
 }
 
@@ -54,8 +60,8 @@ class _MainShellState extends State<MainShell> {
               backgroundColor: Colors.white,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.menu_rounded,
-                    color: AppTheme.textPrimary),
+                icon:
+                    const Icon(Icons.menu_rounded, color: AppTheme.textPrimary),
                 onPressed: () => _scaffoldKey.currentState?.openDrawer(),
               ),
               title: RichText(
@@ -101,8 +107,7 @@ class _MainShellState extends State<MainShell> {
               children: [
                 Sidebar(
                   selectedIndex: _selectedIndex,
-                  onItemSelected: (i) =>
-                      setState(() => _selectedIndex = i),
+                  onItemSelected: (i) => setState(() => _selectedIndex = i),
                 ),
                 Expanded(child: _getScreenContent()),
               ],
@@ -110,48 +115,48 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-Widget _getScreenContent() {
-  Widget screen;
+  Widget _getScreenContent() {
+    Widget screen;
 
-  switch (_selectedIndex) {
-    case 0:
-      screen = const DashboardScreen();
-      break;
-    case 1:
-      screen = const SensorsScreen();
-      break;
-    case 2:
-      screen = const DevicesScreen();
-      break;
-    case 3:
-      screen = const AlertsScreen();
-      break;
-    case 4:
-      screen = const LogScreen();
-      break;
-    case 5:
-      screen = const PlantsScreen();
-      break;
-    case 6:
-      screen = const StatisticsScreen();
-      break;
-    case 7:
-      screen = const SettingsScreen();
-      break;
-    default:
-      screen = const Esp32Screen();
-  }
+    switch (_selectedIndex) {
+      case 0:
+        screen = const DashboardScreen();
+        break;
+      case 1:
+        screen = const SensorsScreen();
+        break;
+      case 2:
+        screen = const DevicesScreen();
+        break;
+      case 3:
+        screen = const AlertsScreen();
+        break;
+      case 4:
+        screen = const LogScreen();
+        break;
+      case 5:
+        screen = const PlantsScreen();
+        break;
+      case 6:
+        screen = const StatisticsScreen();
+        break;
+      case 7:
+        screen = const SettingsScreen();
+        break;
+      default:
+        screen = const Esp32Screen();
+    }
 
-  return SafeArea(
-    child: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1000),
-        child: Padding(
-          padding: ResponsiveHelper.getPadding(context),
-          child: screen,
+    return SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Padding(
+            padding: ResponsiveHelper.getPadding(context),
+            child: screen,
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

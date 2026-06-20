@@ -375,7 +375,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const SizedBox(width: 8),
                     Switch(
                       value: _darkMode,
-                      onChanged: (v) => setState(() => _darkMode = v),
+                      onChanged: (v) {
+                        setState(() => _darkMode = v);
+
+                        AppSettingsController.themeMode.value =
+                            v ? ThemeMode.dark : ThemeMode.light;
+                      },
                       activeColor: AppTheme.primary,
                     ),
                     const SizedBox(width: 8),
@@ -392,7 +397,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     DropdownMenuItem(value: 'hu', child: Text('Magyar')),
                     DropdownMenuItem(value: 'en', child: Text('English')),
                   ],
-                  onChanged: (v) => setState(() => _language = v ?? 'hu'),
+                  onChanged: (v) {
+                    final selected = v ?? 'hu';
+
+                    setState(() => _language = selected);
+
+                    AppSettingsController.language.value = selected;
+                  },
                   underline: const SizedBox(),
                 ),
               ),
