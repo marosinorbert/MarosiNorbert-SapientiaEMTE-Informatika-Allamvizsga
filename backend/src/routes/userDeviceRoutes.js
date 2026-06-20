@@ -96,4 +96,83 @@ router.post('/claim', authMiddleware, async (req, res) => {
     res.json(claimedDevice);
 });
 
+router.delete('/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+
+    const deviceResult = await pool.query(
+        `
+        SELECT id, device_name
+        FROM greenhouse_devices
+        WHERE id = $1
+        AND user_id = $2
+        AND is_claimed = true
+        `,
+        [id, req.user.id]
+    );
+
+    if (deviceResult.rows.length === 0) {
+        return res.status(404).json({
+            message: 'Az ESP32 eszköz nem található ennél a felhasználónál.',
+        });
+    }
+
+    const device = deviceResult.rows[0];
+
+    await pool.query(
+        `
+        DELETE FROM device_state
+        WHERE user_id = $1
+        AND greenhouse_device_id = $2
+        `,
+        [req.user.id, device.id]
+    );
+
+    await pool.query(
+        `
+        DELETE FROM esp32_status
+        WHERE user_id = $1
+        AND greenhouse_device_id = $2
+        `,
+        [req.user.id, device.id]
+    );
+
+    await pool.query(
+        `
+        UPDATE greenhouse_devices
+        SET
+            user_id = NULL,
+            is_claimed = false,
+            claimed_at = NULL
+        WHERE id = $1
+        AND user_id = $2
+        `,
+        [device.id, req.user.id]
+    );
+
+    await pool.query(
+        `
+        INSERT INTO system_logs (
+            user_id,
+            greenhouse_device_id,
+            type,
+            title,
+            description
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        `,
+        [
+            req.user.id,
+            null,
+            'system',
+            'ESP32 eszköz leválasztva',
+            `A(z) ${device.device_name} eszköz le lett választva a felhasználói fiókról.`,
+        ]
+    );
+
+    res.json({
+        success: true,
+        message: 'Az ESP32 eszköz sikeresen le lett választva.',
+    });
+});
+
 module.exports = router;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import 'login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -223,6 +224,107 @@ class _SettingsScreenState extends State<SettingsScreen> {
         });
       }
     }
+  }
+
+  Future<void> _deleteDevice(dynamic device) async {
+    try {
+      await ApiService.deleteMyDevice(device['id']);
+
+      await _loadMyDevices();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Az ESP32 eszköz le lett választva.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Nem sikerült leválasztani az ESP32-t: $e'),
+        ),
+      );
+    }
+  }
+
+  void _confirmDeleteDevice(dynamic device) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('ESP32 leválasztása'),
+          content: Text(
+            'Biztosan le szeretnéd választani ezt az eszközt?\n\n'
+            '${device['device_name'] ?? 'ESP32 eszköz'}\n'
+            'Claim kód: ${device['claim_code'] ?? '-'}\n\n'
+            'Az eszköz ezután újra hozzárendelhető lesz egy felhasználói fiókhoz.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Mégse'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await _deleteDevice(device);
+              },
+              child: const Text('Leválasztás'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _logout() async {
+    await ApiService.logout();
+
+    if (!mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  void _confirmLogout() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Kijelentkezés'),
+          content: const Text(
+            'Biztosan ki szeretnél jelentkezni ebből a fiókból?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Mégse'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF4444),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                await _logout();
+              },
+              child: const Text('Kijelentkezés'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _changePassword() {
@@ -629,10 +731,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ],
                             ),
                           ),
-                          const Icon(
-                            Icons.check_circle_rounded,
-                            color: AppTheme.primary,
-                            size: 20,
+                          IconButton(
+                            tooltip: 'ESP32 leválasztása',
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: Color(0xFFEF4444),
+                            ),
+                            onPressed: () => _confirmDeleteDevice(device),
                           ),
                         ],
                       ),
@@ -917,7 +1022,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 16),
 
+          _SettingsSection(
+            title: 'Fiók',
+            icon: Icons.account_circle_rounded,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _confirmLogout,
+                  icon: const Icon(Icons.logout_rounded),
+                  label: const Text('Kijelentkezés'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFEF4444),
+                    side: const BorderSide(color: Color(0xFFEF4444)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Kijelentkezés után újra be kell jelentkezned a fiókodhoz tartozó melegház adatok eléréséhez.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 28),
         ],
       ),

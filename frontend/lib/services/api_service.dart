@@ -456,4 +456,19 @@ class ApiService {
       data['message'] ?? 'Nem sikerült hozzárendelni az eszközt',
     );
   }
+
+  static Future<void> deleteMyDevice(int id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/my-devices/$id'),
+      headers: await authHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body);
+
+      throw Exception(
+        data['message'] ?? 'Nem sikerült leválasztani az ESP32 eszközt',
+      );
+    }
+  }
 }
