@@ -46,19 +46,54 @@ router.post('/claim', authMiddleware, async (req, res) => {
         });
     }
 
+    const claimedDevice = result.rows[0];
+
     await pool.query(
         `
-    INSERT INTO system_logs (type, title, description)
-    VALUES ($1, $2, $3)
-    `,
+  INSERT INTO device_state (
+    user_id,
+    greenhouse_device_id,
+    device_name,
+    is_on,
+    is_auto,
+    schedule_enabled,
+    schedule_on,
+    schedule_off
+  )
+  VALUES
+    ($1, $2, 'pump', false, true, true, '08:00', '08:30'),
+    ($1, $2, 'light', false, true, true, '06:00', '20:00'),
+    ($1, $2, 'fan', false, true, true, '07:00', '21:00'),
+    ($1, $2, 'heater', false, true, true, '05:00', '09:00')
+  ON CONFLICT (user_id, greenhouse_device_id, device_name) DO NOTHING
+  `,
         [
-            'system',
-            'ESP32 eszköz hozzárendelve',
-            `A(z) ${result.rows[0].device_name} eszköz hozzá lett rendelve a felhasználóhoz.`,
+            req.user.id,
+            claimedDevice.id,
         ]
     );
 
-    res.json(result.rows[0]);
+    await pool.query(
+        `
+  INSERT INTO system_logs (
+    user_id,
+    greenhouse_device_id,
+    type,
+    title,
+    description
+  )
+  VALUES ($1, $2, $3, $4, $5)
+  `,
+        [
+            req.user.id,
+            claimedDevice.id,
+            'system',
+            'ESP32 eszköz hozzárendelve',
+            `A(z) ${claimedDevice.device_name} eszköz hozzá lett rendelve a felhasználóhoz.`,
+        ]
+    );
+
+    res.json(claimedDevice);
 });
 
 module.exports = router;

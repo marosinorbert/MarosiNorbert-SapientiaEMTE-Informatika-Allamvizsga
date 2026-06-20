@@ -91,7 +91,7 @@ class ApiService {
   static Future<void> toggleDevice(String device, bool isOn) async {
     final response = await http.post(
       Uri.parse('$baseUrl/devices/$device'),
-      headers: headers,
+      headers: await authHeaders(),
       body: jsonEncode({
         'isOn': isOn,
       }),
@@ -105,7 +105,7 @@ class ApiService {
   static Future<List<dynamic>> getDevices() async {
     final response = await http.get(
       Uri.parse('$baseUrl/devices'),
-      headers: headers,
+      headers: await authHeaders(),
     );
 
     if (response.statusCode == 200) {
@@ -118,7 +118,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getSettings() async {
     final response = await http.get(
       Uri.parse('$baseUrl/settings'),
-      headers: headers,
+      headers: await authHeaders(),
     );
 
     if (response.statusCode == 200) {
@@ -143,7 +143,7 @@ class ApiService {
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/settings'),
-      headers: headers,
+      headers: await authHeaders(),
       body: jsonEncode({
         'tempMin': tempMin,
         'tempMax': tempMax,
@@ -167,7 +167,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getEsp32Status() async {
     final response = await http.get(
       Uri.parse('$baseUrl/esp32/status'),
-      headers: headers,
+      headers: await authHeaders(),
     );
 
     if (response.statusCode == 200) {
@@ -180,7 +180,7 @@ class ApiService {
   static Future<List<dynamic>> getAlerts() async {
     final response = await http.get(
       Uri.parse('$baseUrl/alerts'),
-      headers: headers,
+      headers: await authHeaders(),
     );
 
     if (response.statusCode == 200) {
@@ -193,7 +193,7 @@ class ApiService {
   static Future<void> acknowledgeAlert(int id) async {
     final response = await http.patch(
       Uri.parse('$baseUrl/alerts/$id/read'),
-      headers: headers,
+      headers: await authHeaders(),
     );
 
     if (response.statusCode != 200) {
@@ -204,7 +204,7 @@ class ApiService {
   static Future<void> toggleDeviceMode(String device, bool isAuto) async {
     final response = await http.post(
       Uri.parse('$baseUrl/devices/$device/mode'),
-      headers: headers,
+      headers: await authHeaders(),
       body: jsonEncode({
         'isAuto': isAuto,
       }),
@@ -218,7 +218,7 @@ class ApiService {
   static Future<List<dynamic>> getLogs() async {
     final response = await http.get(
       Uri.parse('$baseUrl/logs'),
-      headers: headers,
+      headers: await authHeaders(),
     );
 
     if (response.statusCode == 200) {
@@ -236,7 +236,7 @@ class ApiService {
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/devices/$device/schedule'),
-      headers: headers,
+      headers: await authHeaders(),
       body: jsonEncode({
         'scheduleEnabled': scheduleEnabled,
         'scheduleOn': scheduleOn,
@@ -252,7 +252,7 @@ class ApiService {
   static Future<void> deleteAlert(int id) async {
     final response = await http.delete(
       Uri.parse('$baseUrl/alerts/$id'),
-      headers: headers,
+      headers: await authHeaders(),
     );
 
     if (response.statusCode != 200) {
@@ -263,7 +263,7 @@ class ApiService {
   static Future<void> deleteAllAlerts() async {
     final response = await http.delete(
       Uri.parse('$baseUrl/alerts'),
-      headers: headers,
+      headers: await authHeaders(),
     );
 
     if (response.statusCode != 200) {
@@ -274,7 +274,7 @@ class ApiService {
   static Future<List<dynamic>> getPlants() async {
     final response = await http.get(
       Uri.parse('$baseUrl/plants'),
-      headers: headers,
+      headers: await authHeaders(),
     );
 
     if (response.statusCode == 200) {
@@ -299,7 +299,7 @@ class ApiService {
   }) async {
     final response = await http.post(
       Uri.parse('$baseUrl/plants'),
-      headers: headers,
+      headers: await authHeaders(),
       body: jsonEncode({
         'name': name,
         'species': species,
@@ -323,7 +323,7 @@ class ApiService {
   static Future<void> deletePlant(int id) async {
     final response = await http.delete(
       Uri.parse('$baseUrl/plants/$id'),
-      headers: headers,
+      headers: await authHeaders(),
     );
 
     if (response.statusCode != 200) {
@@ -347,7 +347,7 @@ class ApiService {
   }) async {
     final response = await http.put(
       Uri.parse('$baseUrl/plants/$id'),
-      headers: headers,
+      headers: await authHeaders(),
       body: jsonEncode({
         'name': name,
         'species': species,

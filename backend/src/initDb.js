@@ -2,6 +2,43 @@ const pool = require('./db');
 
 async function initDb() {
   await pool.query(`
+  CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS greenhouse_devices (
+      id SERIAL PRIMARY KEY,
+      device_name VARCHAR(100) DEFAULT 'Okos melegház',
+      claim_code VARCHAR(50) UNIQUE NOT NULL,
+      device_token TEXT UNIQUE NOT NULL,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      is_claimed BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      claimed_at TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    INSERT INTO greenhouse_devices (
+      device_name,
+      claim_code,
+      device_token
+    )
+    VALUES (
+      'ESP32-S3 Okos melegház',
+      'GH-001-A7K9',
+      'esp32_device_token_gh_001_a7k9_2026'
+    )
+    ON CONFLICT (claim_code) DO NOTHING;
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS sensor_data (
       id SERIAL PRIMARY KEY,
       temperature NUMERIC(5,2),
@@ -31,7 +68,7 @@ async function initDb() {
   await pool.query(`
   CREATE TABLE IF NOT EXISTS device_state (
     id SERIAL PRIMARY KEY,
-    device_name VARCHAR(50) UNIQUE NOT NULL,
+    device_name VARCHAR(50) NOT NULL,
     is_on BOOLEAN DEFAULT FALSE,
     is_auto BOOLEAN DEFAULT TRUE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -39,45 +76,29 @@ async function initDb() {
 `);
 
   await pool.query(`
-  CREATE TABLE IF NOT EXISTS greenhouse_devices (
-    id SERIAL PRIMARY KEY,
-    device_name VARCHAR(100) DEFAULT 'Okos melegház',
-    claim_code VARCHAR(50) UNIQUE NOT NULL,
-    device_token TEXT UNIQUE NOT NULL,
-    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    is_claimed BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    claimed_at TIMESTAMP
-  );
-`);
-
-  await pool.query(`
-  INSERT INTO greenhouse_devices (
-    device_name,
-    claim_code,
-    device_token
-  )
-  VALUES (
-    'ESP32-S3 Okos melegház',
-    'GH-001-A7K9',
-    'esp32_device_token_gh_001_a7k9_2026'
-  )
-  ON CONFLICT (claim_code) DO NOTHING;
+  ALTER TABLE device_state
+  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
 `);
 
   await pool.query(`
   ALTER TABLE device_state
-  ADD COLUMN IF NOT EXISTS is_auto BOOLEAN DEFAULT TRUE;
+  ADD COLUMN IF NOT EXISTS greenhouse_device_id INTEGER REFERENCES greenhouse_devices(id) ON DELETE CASCADE;
 `);
 
   await pool.query(`
-  INSERT INTO device_state (device_name, is_on)
-  VALUES
-    ('pump', false),
-    ('light', false),
-    ('fan', false),
-    ('heater', false)
-  ON CONFLICT (device_name) DO NOTHING;
+  ALTER TABLE device_state
+  DROP CONSTRAINT IF EXISTS device_state_device_name_key;
+`);
+
+  await pool.query(`
+  CREATE UNIQUE INDEX IF NOT EXISTS device_state_user_device_unique
+  ON device_state(user_id, greenhouse_device_id, device_name);
+`);
+
+
+  await pool.query(`
+  ALTER TABLE device_state
+  ADD COLUMN IF NOT EXISTS is_auto BOOLEAN DEFAULT TRUE;
 `);
 
   await pool.query(`
@@ -93,42 +114,6 @@ async function initDb() {
   await pool.query(`
   ALTER TABLE device_state
   ADD COLUMN IF NOT EXISTS schedule_off TIME DEFAULT '20:00';
-`);
-
-  await pool.query(`
-  UPDATE device_state
-  SET 
-    schedule_enabled = true,
-    schedule_on = '08:00',
-    schedule_off = '08:30'
-  WHERE device_name = 'pump';
-`);
-
-  await pool.query(`
-  UPDATE device_state
-  SET 
-    schedule_enabled = true,
-    schedule_on = '06:00',
-    schedule_off = '20:00'
-  WHERE device_name = 'light';
-`);
-
-  await pool.query(`
-  UPDATE device_state
-  SET 
-    schedule_enabled = true,
-    schedule_on = '07:00',
-    schedule_off = '21:00'
-  WHERE device_name = 'fan';
-`);
-
-  await pool.query(`
-  UPDATE device_state
-  SET 
-    schedule_enabled = true,
-    schedule_on = '05:00',
-    schedule_off = '09:00'
-  WHERE device_name = 'heater';
 `);
 
   await pool.query(`
@@ -151,13 +136,13 @@ async function initDb() {
 `);
 
   await pool.query(`
-  CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(150) UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  );
+  ALTER TABLE system_settings
+  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+`);
+
+  await pool.query(`
+  CREATE UNIQUE INDEX IF NOT EXISTS system_settings_user_unique
+  ON system_settings(user_id);
 `);
 
   await pool.query(`
@@ -218,6 +203,7 @@ async function initDb() {
   );
 `);
 
+
   await pool.query(`
   INSERT INTO esp32_status (id, is_online)
   VALUES (1, false)
@@ -235,6 +221,11 @@ async function initDb() {
 `);
 
   await pool.query(`
+  CREATE UNIQUE INDEX IF NOT EXISTS esp32_status_device_unique
+  ON esp32_status(greenhouse_device_id);
+`);
+
+  await pool.query(`
 CREATE TABLE IF NOT EXISTS alerts (
   id SERIAL PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
@@ -247,6 +238,16 @@ CREATE TABLE IF NOT EXISTS alerts (
 `);
 
   await pool.query(`
+  ALTER TABLE alerts
+  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+`);
+
+  await pool.query(`
+  ALTER TABLE alerts
+  ADD COLUMN IF NOT EXISTS greenhouse_device_id INTEGER REFERENCES greenhouse_devices(id) ON DELETE SET NULL;
+`);
+
+  await pool.query(`
   CREATE TABLE IF NOT EXISTS system_logs (
     id SERIAL PRIMARY KEY,
     type VARCHAR(30) NOT NULL,
@@ -254,6 +255,16 @@ CREATE TABLE IF NOT EXISTS alerts (
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
+`);
+
+  await pool.query(`
+  ALTER TABLE system_logs
+  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+`);
+
+  await pool.query(`
+  ALTER TABLE system_logs
+  ADD COLUMN IF NOT EXISTS greenhouse_device_id INTEGER REFERENCES greenhouse_devices(id) ON DELETE SET NULL;
 `);
 
   await pool.query(`
@@ -279,6 +290,11 @@ CREATE TABLE IF NOT EXISTS alerts (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
+`);
+
+  await pool.query(`
+  ALTER TABLE plants
+  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
 `);
 
   await pool.query(`

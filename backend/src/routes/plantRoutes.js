@@ -1,18 +1,43 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const authMiddleware = require('../middleware/authMiddleware');
 
-router.get('/', async (req, res) => {
-  const result = await pool.query(`
+async function getUserDeviceId(userId) {
+  const result = await pool.query(
+    `
+    SELECT id
+    FROM greenhouse_devices
+    WHERE user_id = $1
+    AND is_claimed = true
+    ORDER BY claimed_at DESC
+    LIMIT 1
+    `,
+    [userId]
+  );
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  return result.rows[0].id;
+}
+
+router.get('/', authMiddleware, async (req, res) => {
+  const result = await pool.query(
+    `
     SELECT *
     FROM plants
+    WHERE user_id = $1
     ORDER BY created_at DESC
-  `);
+    `,
+    [req.user.id]
+  );
 
   res.json(result.rows);
 });
 
-router.post('/', async (req, res) => {
+router.post('/', authMiddleware, async (req, res) => {
   const {
     name,
     species,
@@ -30,6 +55,7 @@ router.post('/', async (req, res) => {
   const result = await pool.query(
     `
     INSERT INTO plants (
+      user_id,
       name,
       species,
       emoji,
@@ -42,10 +68,11 @@ router.post('/', async (req, res) => {
       light_min,
       light_max
     )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
     RETURNING *
     `,
     [
+      req.user.id,
       name,
       species || 'Ismeretlen fajta',
       emoji || '🌱',
@@ -60,12 +87,22 @@ router.post('/', async (req, res) => {
     ]
   );
 
+  const greenhouseDeviceId = await getUserDeviceId(req.user.id);
+
   await pool.query(
     `
-    INSERT INTO system_logs (type, title, description)
-    VALUES ($1, $2, $3)
+    INSERT INTO system_logs (
+      user_id,
+      greenhouse_device_id,
+      type,
+      title,
+      description
+    )
+    VALUES ($1, $2, $3, $4, $5)
     `,
     [
+      req.user.id,
+      greenhouseDeviceId,
       'system',
       'Új növény hozzáadva',
       `${name} hozzá lett adva a növények listájához.`,
@@ -75,7 +112,7 @@ router.post('/', async (req, res) => {
   res.status(201).json(result.rows[0]);
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
 
   const {
@@ -109,6 +146,7 @@ router.put('/:id', async (req, res) => {
       light_max = $11,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = $12
+    AND user_id = $13
     RETURNING *
     `,
     [
@@ -124,18 +162,89 @@ router.put('/:id', async (req, res) => {
       lightMin,
       lightMax,
       id,
+      req.user.id,
+    ]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({
+      message: 'A növény nem található ennél a felhasználónál.',
+    });
+  }
+
+  const greenhouseDeviceId = await getUserDeviceId(req.user.id);
+
+  await pool.query(
+    `
+    INSERT INTO system_logs (
+      user_id,
+      greenhouse_device_id,
+      type,
+      title,
+      description
+    )
+    VALUES ($1, $2, $3, $4, $5)
+    `,
+    [
+      req.user.id,
+      greenhouseDeviceId,
+      'system',
+      'Növény módosítva',
+      `${name} adatai módosítva lettek.`,
     ]
   );
 
   res.json(result.rows[0]);
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
 
+  const plantResult = await pool.query(
+    `
+    SELECT name
+    FROM plants
+    WHERE id = $1
+    AND user_id = $2
+    `,
+    [id, req.user.id]
+  );
+
+  if (plantResult.rows.length === 0) {
+    return res.status(404).json({
+      message: 'A növény nem található ennél a felhasználónál.',
+    });
+  }
+
   await pool.query(
-    'DELETE FROM plants WHERE id = $1',
-    [id]
+    `
+    DELETE FROM plants
+    WHERE id = $1
+    AND user_id = $2
+    `,
+    [id, req.user.id]
+  );
+
+  const greenhouseDeviceId = await getUserDeviceId(req.user.id);
+
+  await pool.query(
+    `
+    INSERT INTO system_logs (
+      user_id,
+      greenhouse_device_id,
+      type,
+      title,
+      description
+    )
+    VALUES ($1, $2, $3, $4, $5)
+    `,
+    [
+      req.user.id,
+      greenhouseDeviceId,
+      'system',
+      'Növény törölve',
+      `${plantResult.rows[0].name} törölve lett a növények közül.`,
+    ]
   );
 
   res.json({ success: true });
