@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   static const String baseUrl =
@@ -10,10 +11,41 @@ class ApiService {
     'ngrok-skip-browser-warning': 'true',
   };
 
+  static const String _tokenKey = 'auth_token';
+
+  static Future<void> saveToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_tokenKey, token);
+  }
+
+  static Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_tokenKey);
+  }
+
+  static Future<bool> isLoggedIn() async {
+    final token = await getToken();
+    return token != null && token.isNotEmpty;
+  }
+
+  static Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tokenKey);
+  }
+
+  static Future<Map<String, String>> authHeaders() async {
+    final token = await getToken();
+
+    return {
+      ...headers,
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
   static Future<Map<String, dynamic>> getLatestSensorData() async {
     final response = await http.get(
       Uri.parse('$baseUrl/sensors'),
-      headers: headers,
+      headers: await authHeaders(),
     );
 
     if (response.statusCode == 200) {
@@ -43,7 +75,7 @@ class ApiService {
 
     final response = await http.get(
       Uri.parse(url),
-      headers: headers,
+      headers: await authHeaders(),
     );
 
     if (response.statusCode == 200) {
@@ -318,6 +350,8 @@ class ApiService {
       headers: headers,
       body: jsonEncode({
         'name': name,
+        'species': species,
+        'emoji': emoji,
         'tempMin': tempMin,
         'tempMax': tempMax,
         'humidityMin': humidityMin,
@@ -332,5 +366,88 @@ class ApiService {
     if (response.statusCode != 200) {
       throw Exception('Nem sikerült módosítani a növényt');
     }
+  }
+
+  static Future<Map<String, dynamic>> register({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/register'),
+      headers: headers,
+      body: jsonEncode({
+        'name': name,
+        'email': email,
+        'password': password,
+      }),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 201) {
+      await saveToken(data['token']);
+      return data;
+    }
+
+    throw Exception(data['message'] ?? 'Sikertelen regisztráció');
+  }
+
+  static Future<Map<String, dynamic>> login({
+    required String email,
+    required String password,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/login'),
+      headers: headers,
+      body: jsonEncode({
+        'email': email,
+        'password': password,
+      }),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      await saveToken(data['token']);
+      return data;
+    }
+
+    throw Exception(data['message'] ?? 'Sikertelen bejelentkezés');
+  }
+
+  static Future<List<dynamic>> getMyDevices() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/my-devices'),
+      headers: await authHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    }
+
+    throw Exception('Nem sikerült lekérni a saját eszközöket');
+  }
+
+  static Future<Map<String, dynamic>> claimDevice({
+    required String claimCode,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/my-devices/claim'),
+      headers: await authHeaders(),
+      body: jsonEncode({
+        'claimCode': claimCode,
+      }),
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (response.statusCode == 200) {
+      return data;
+    }
+
+    throw Exception(
+      data['message'] ?? 'Nem sikerült hozzárendelni az eszközt',
+    );
   }
 }

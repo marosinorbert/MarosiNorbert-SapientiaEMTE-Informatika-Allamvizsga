@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const deviceMiddleware = require('../middleware/deviceMiddleware');
 
 router.get('/status', async (req, res) => {
   const result = await pool.query(`
@@ -31,7 +32,7 @@ router.get('/status', async (req, res) => {
   });
 });
 
-router.post('/heartbeat', async (req, res) => {
+router.post('/heartbeat', deviceMiddleware, async (req, res) => {
   const {
     wifiConnected,
     mqttConnected,
@@ -46,22 +47,24 @@ router.post('/heartbeat', async (req, res) => {
 
   const result = await pool.query(
     `
-    UPDATE esp32_status
-    SET
-      is_online = true,
-      wifi_connected = $1,
-      mqtt_connected = $2,
-      signal_strength = $3,
-      free_ram = $4,
-      total_ram = $5,
-      cpu_temp = $6,
-      uptime_seconds = $7,
-      ip_address = $8,
-      firmware_version = $9,
-      last_seen = CURRENT_TIMESTAMP
-    WHERE id = 1
-    RETURNING *
-    `,
+  UPDATE esp32_status
+  SET
+    is_online = true,
+    wifi_connected = $1,
+    mqtt_connected = $2,
+    signal_strength = $3,
+    free_ram = $4,
+    total_ram = $5,
+    cpu_temp = $6,
+    uptime_seconds = $7,
+    ip_address = $8,
+    firmware_version = $9,
+    user_id = $10,
+    greenhouse_device_id = $11,
+    last_seen = CURRENT_TIMESTAMP
+  WHERE id = 1
+  RETURNING *
+  `,
     [
       wifiConnected,
       mqttConnected,
@@ -72,13 +75,15 @@ router.post('/heartbeat', async (req, res) => {
       uptimeSeconds,
       ipAddress,
       firmwareVersion,
+      req.device.user_id,
+      req.device.id,
     ]
   );
 
   res.json(result.rows[0]);
 });
 
-router.get('/commands', async (req, res) => {
+router.get('/commands', deviceMiddleware, async (req, res) => {
   const result = await pool.query(`
     SELECT device_name, is_on
     FROM device_state

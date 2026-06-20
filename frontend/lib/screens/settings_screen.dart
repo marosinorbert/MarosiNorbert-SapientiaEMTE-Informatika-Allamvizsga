@@ -14,6 +14,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late TextEditingController _wifiPasswordCtrl;
   late TextEditingController _mqttBrokerCtrl;
   late TextEditingController _mqttPortCtrl;
+  late TextEditingController _claimCodeCtrl;
+
+  List<dynamic> _myDevices = [];
+  bool _isClaimingDevice = false;
 
   bool _isLoading = true;
   String? _error;
@@ -35,8 +39,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _wifiPasswordCtrl = TextEditingController(text: _wifiPassword);
     _mqttBrokerCtrl = TextEditingController(text: _mqttBroker);
     _mqttPortCtrl = TextEditingController(text: _mqttPort.toString());
+    _claimCodeCtrl = TextEditingController();
 
     _loadSettings();
+    _loadMyDevices();
   }
 
   @override
@@ -45,6 +51,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _wifiPasswordCtrl.dispose();
     _mqttBrokerCtrl.dispose();
     _mqttPortCtrl.dispose();
+    _claimCodeCtrl.dispose();
     super.dispose();
   }
 
@@ -152,6 +159,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
           duration: const Duration(seconds: 3),
         ),
       );
+    }
+  }
+
+  Future<void> _loadMyDevices() async {
+    try {
+      final devices = await ApiService.getMyDevices();
+
+      if (!mounted) return;
+
+      setState(() {
+        _myDevices = devices;
+      });
+    } catch (e) {
+      // Ha még nincs eszköz vagy nincs token, ne törje meg a Settings oldalt.
+    }
+  }
+
+  Future<void> _claimDevice() async {
+    final claimCode = _claimCodeCtrl.text.trim();
+
+    if (claimCode.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add meg az ESP32 claim kódját.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isClaimingDevice = true;
+    });
+
+    try {
+      await ApiService.claimDevice(claimCode: claimCode);
+
+      _claimCodeCtrl.clear();
+      await _loadMyDevices();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✓ ESP32 eszköz sikeresen hozzárendelve!'),
+          backgroundColor: AppTheme.primary,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isClaimingDevice = false;
+        });
+      }
     }
   }
 
@@ -424,42 +494,151 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 16),
 
-          // Connection settings
+          // ESP32 device claim
           _SettingsSection(
-            title: 'Kapcsolat',
-            icon: Icons.wifi_rounded,
+            title: 'Saját ESP32 eszköz',
+            icon: Icons.memory_rounded,
             children: [
-              _SettingLabel('WiFi'),
-              _SettingsTextField(
-                label: 'SSID',
-                hint: 'WiFi hálózat neve', // ← ADD THIS
-                controller: _wifiSSIDCtrl,
-                onChanged: (v) => _wifiSSID = v,
+              const Text(
+                'Add meg az ESP32-re ragasztott egyedi claim kódot. '
+                'Ezzel az eszköz a saját fiókodhoz lesz rendelve.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
+                  height: 1.4,
+                ),
               ),
+              const SizedBox(height: 14),
+              _SettingsTextField(
+                label: 'Claim kód',
+                hint: 'pl. GH-001-A7K9',
+                controller: _claimCodeCtrl,
+                onChanged: (_) {},
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton.icon(
+                  onPressed: _isClaimingDevice ? null : _claimDevice,
+                  icon: _isClaimingDevice
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.link_rounded),
+                  label: Text(
+                    _isClaimingDevice
+                        ? 'Hozzárendelés...'
+                        : 'ESP32 hozzárendelése',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              _SettingLabel('Hozzárendelt eszközök'),
               const SizedBox(height: 8),
-              _SettingsTextField(
-                label: 'Jelszó',
-                hint: 'WiFi jelszó', // ← ADD THIS
-                controller: _wifiPasswordCtrl,
-                onChanged: (v) => _wifiPassword = v,
-                obscure: true,
-              ),
-              const SizedBox(height: 16),
-              _SettingLabel('MQTT'),
-              _SettingsTextField(
-                label: 'Broker cím',
-                hint: 'mqtt.example.com', // ← ADD THIS
-                controller: _mqttBrokerCtrl,
-                onChanged: (v) => _mqttBroker = v,
-              ),
-              const SizedBox(height: 8),
-              _SettingsTextField(
-                label: 'Port',
-                hint: '1883', // ← ADD THIS
-                controller: _mqttPortCtrl,
-                onChanged: (v) => _mqttPort = int.tryParse(v) ?? 1883,
-                keyboardType: TextInputType.number,
-              ),
+              if (_myDevices.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: const Text(
+                    'Még nincs ESP32 eszköz hozzárendelve ehhez a fiókhoz.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                )
+              else
+                Column(
+                  children: _myDevices.map((device) {
+                    final name = device['device_name'] ?? 'ESP32 eszköz';
+                    final code = device['claim_code'] ?? '-';
+                    final claimedAt = device['claimed_at'];
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppTheme.primary.withOpacity(0.25),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.memory_rounded,
+                              color: AppTheme.primary,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name.toString(),
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'Kód: $code',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                                if (claimedAt != null)
+                                  Text(
+                                    'Hozzárendelve: $claimedAt',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.textSecondary,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            color: AppTheme.primary,
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
             ],
           ),
 

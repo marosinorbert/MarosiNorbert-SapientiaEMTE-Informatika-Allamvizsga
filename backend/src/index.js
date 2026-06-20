@@ -12,12 +12,14 @@ const alertRoutes = require('./routes/alertRoutes');
 const logRoutes = require('./routes/logRoutes');
 const plantRoutes = require('./routes/plantRoutes');
 const authRoutes = require('./routes/authRoutes');
+const userDeviceRoutes = require('./routes/userDeviceRoutes');
 
 app.use(cors({
   origin: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
+    'Authorization',
     'ngrok-skip-browser-warning',
   ],
 }));
@@ -31,6 +33,7 @@ app.use('/api/alerts', alertRoutes);
 app.use('/api/logs', logRoutes);
 app.use('/api/plants', plantRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/my-devices', userDeviceRoutes);
 app.get('/', async (req, res) => {
   const result = await pool.query('SELECT NOW()');
   res.json({

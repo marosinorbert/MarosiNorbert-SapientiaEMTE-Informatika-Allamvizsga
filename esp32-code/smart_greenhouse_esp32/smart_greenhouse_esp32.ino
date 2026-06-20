@@ -7,11 +7,12 @@
 #include <Adafruit_SSD1306.h>
 
 // WiFi
-const char* WIFI_SSID = "Marosi";
-const char* WIFI_PASSWORD = "Marosi65A";
+const char *WIFI_SSID = "Marosi";
+const char *WIFI_PASSWORD = "Marosi65A";
+const char *DEVICE_TOKEN = "esp32_device_token_gh_001_a7k9_2026";
 
 // Backend ngrok URL
-const char* API_BASE_URL = "https://cultivate-radar-swimmer.ngrok-free.dev/api";
+const char *API_BASE_URL = "https://cultivate-radar-swimmer.ngrok-free.dev/api";
 
 // Pins
 #define OLED_SDA 13
@@ -60,7 +61,8 @@ bool waterDetected = true;
 bool pumpOn = false;
 bool lightOn = false;
 
-int readSoilMoisturePercent() {
+int readSoilMoisturePercent()
+{
   int raw = analogRead(SOIL_AO_PIN);
 
   // Ezt majd kalibrálni kell:
@@ -74,22 +76,27 @@ int readSoilMoisturePercent() {
   return percent;
 }
 
-void setPump(bool state) {
+void setPump(bool state)
+{
   pumpOn = state;
   digitalWrite(PUMP_RELAY_PIN, state ? RELAY_ON : RELAY_OFF);
 }
 
-void setLight(bool state) {
+void setLight(bool state)
+{
   lightOn = state;
   digitalWrite(LIGHT_PIN, state ? HIGH : LOW);
 }
 
-void readSensors() {
+void readSensors()
+{
   float t = dht.readTemperature();
   float h = dht.readHumidity();
 
-  if (!isnan(t)) temperature = t;
-  if (!isnan(h)) humidity = h;
+  if (!isnan(t))
+    temperature = t;
+  if (!isnan(h))
+    humidity = h;
 
   soilPercent = readSoilMoisturePercent();
 
@@ -97,8 +104,10 @@ void readSensors() {
   waterDetected = digitalRead(WATER_SENSOR_PIN) == HIGH;
 }
 
-void sendSensorData() {
-  if (WiFi.status() != WL_CONNECTED) return;
+void sendSensorData()
+{
+  if (WiFi.status() != WL_CONNECTED)
+    return;
 
   HTTPClient http;
   String url = String(API_BASE_URL) + "/sensors";
@@ -106,6 +115,7 @@ void sendSensorData() {
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("ngrok-skip-browser-warning", "true");
+  http.addHeader("x-device-token", DEVICE_TOKEN);
 
   StaticJsonDocument<256> doc;
   doc["temperature"] = temperature;
@@ -126,33 +136,41 @@ void sendSensorData() {
   http.end();
 }
 
-void fetchCommands() {
-  if (WiFi.status() != WL_CONNECTED) return;
+void fetchCommands()
+{
+  if (WiFi.status() != WL_CONNECTED)
+    return;
 
   HTTPClient http;
   String url = String(API_BASE_URL) + "/esp32/commands";
 
   http.begin(url);
   http.addHeader("ngrok-skip-browser-warning", "true");
+  http.addHeader("x-device-token", DEVICE_TOKEN);
 
   int code = http.GET();
 
   Serial.print("GET /esp32/commands: ");
   Serial.println(code);
 
-  if (code == 200) {
+  if (code == 200)
+  {
     String payload = http.getString();
 
     StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, payload);
 
-    if (!error) {
+    if (!error)
+    {
       bool commandPump = doc["pump"] | false;
       bool commandLight = doc["light"] | false;
 
-      if (!waterDetected && commandPump) {
+      if (!waterDetected && commandPump)
+      {
         setPump(false);
-      } else {
+      }
+      else
+      {
         setPump(commandPump);
       }
 
@@ -163,8 +181,10 @@ void fetchCommands() {
   http.end();
 }
 
-void sendHeartbeat() {
-  if (WiFi.status() != WL_CONNECTED) return;
+void sendHeartbeat()
+{
+  if (WiFi.status() != WL_CONNECTED)
+    return;
 
   HTTPClient http;
   String url = String(API_BASE_URL) + "/esp32/heartbeat";
@@ -172,6 +192,7 @@ void sendHeartbeat() {
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("ngrok-skip-browser-warning", "true");
+  http.addHeader("x-device-token", DEVICE_TOKEN);
 
   StaticJsonDocument<256> doc;
   doc["wifiConnected"] = WiFi.status() == WL_CONNECTED;
@@ -195,7 +216,8 @@ void sendHeartbeat() {
   http.end();
 }
 
-void drawDisplay() {
+void drawDisplay()
+{
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
 
@@ -205,7 +227,8 @@ void drawDisplay() {
 
   display.setCursor(0, 12);
 
-  if (displayPage == 0) {
+  if (displayPage == 0)
+  {
     display.print("Temp: ");
     display.print(temperature, 1);
     display.println(" C");
@@ -217,7 +240,9 @@ void drawDisplay() {
     display.print("Soil: ");
     display.print(soilPercent);
     display.println(" %");
-  } else {
+  }
+  else
+  {
     display.print("Water: ");
     display.println(waterDetected ? "OK" : "EMPTY");
 
@@ -234,12 +259,14 @@ void drawDisplay() {
   display.display();
 }
 
-void connectWiFi() {
+void connectWiFi()
+{
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   Serial.print("Connecting WiFi");
 
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     delay(500);
     Serial.print(".");
   }
@@ -249,7 +276,8 @@ void connectWiFi() {
   Serial.println(WiFi.localIP());
 }
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
 
   pinMode(SOIL_DO_PIN, INPUT);
@@ -265,9 +293,12 @@ void setup() {
 
   Wire.begin(OLED_SDA, OLED_SCL);
 
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
+  {
     Serial.println("OLED init failed");
-  } else {
+  }
+  else
+  {
     display.clearDisplay();
     display.display();
   }
@@ -278,26 +309,31 @@ void setup() {
   drawDisplay();
 }
 
-void loop() {
+void loop()
+{
   unsigned long now = millis();
 
-  if (now - lastSensorSend >= SENSOR_INTERVAL) {
+  if (now - lastSensorSend >= SENSOR_INTERVAL)
+  {
     lastSensorSend = now;
     readSensors();
     sendSensorData();
   }
 
-  if (now - lastCommandFetch >= COMMAND_INTERVAL) {
+  if (now - lastCommandFetch >= COMMAND_INTERVAL)
+  {
     lastCommandFetch = now;
     fetchCommands();
   }
 
-  if (now - lastHeartbeat >= HEARTBEAT_INTERVAL) {
+  if (now - lastHeartbeat >= HEARTBEAT_INTERVAL)
+  {
     lastHeartbeat = now;
     sendHeartbeat();
   }
 
-  if (now - lastDisplayChange >= DISPLAY_INTERVAL) {
+  if (now - lastDisplayChange >= DISPLAY_INTERVAL)
+  {
     lastDisplayChange = now;
     displayPage = (displayPage + 1) % 2;
     drawDisplay();

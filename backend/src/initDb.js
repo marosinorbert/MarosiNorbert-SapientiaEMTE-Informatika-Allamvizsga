@@ -19,6 +19,16 @@ async function initDb() {
 `);
 
   await pool.query(`
+  ALTER TABLE sensor_data
+  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+`);
+
+  await pool.query(`
+  ALTER TABLE sensor_data
+  ADD COLUMN IF NOT EXISTS greenhouse_device_id INTEGER REFERENCES greenhouse_devices(id) ON DELETE SET NULL;
+`);
+
+  await pool.query(`
   CREATE TABLE IF NOT EXISTS device_state (
     id SERIAL PRIMARY KEY,
     device_name VARCHAR(50) UNIQUE NOT NULL,
@@ -212,6 +222,16 @@ async function initDb() {
   INSERT INTO esp32_status (id, is_online)
   VALUES (1, false)
   ON CONFLICT (id) DO NOTHING;
+`);
+
+  await pool.query(`
+  ALTER TABLE esp32_status
+  ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+`);
+
+  await pool.query(`
+  ALTER TABLE esp32_status
+  ADD COLUMN IF NOT EXISTS greenhouse_device_id INTEGER REFERENCES greenhouse_devices(id) ON DELETE SET NULL;
 `);
 
   await pool.query(`

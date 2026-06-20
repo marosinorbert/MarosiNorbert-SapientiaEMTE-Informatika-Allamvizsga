@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../services/api_service.dart';
+import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -56,14 +58,24 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _controller.forward();
+    _goNext();
+  }
 
-    Timer(const Duration(milliseconds: 3100), () {
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainShell()),
-      );
-    });
+  Future<void> _goNext() async {
+    await Future.delayed(const Duration(milliseconds: 3100));
+
+    if (!mounted) return;
+
+    final loggedIn = await ApiService.isLoggedIn();
+
+    if (!mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => loggedIn ? const MainShell() : const LoginScreen(),
+      ),
+    );
   }
 
   @override
@@ -136,13 +148,11 @@ class _SplashScreenState extends State<SplashScreen>
                                 ],
                               ),
                             ),
-
                             Image.asset(
                               'assets/images/logo.png',
                               width: 112,
                               height: 112,
                             ),
-
                             Positioned(
                               top: 32,
                               right: 34,
@@ -161,9 +171,7 @@ class _SplashScreenState extends State<SplashScreen>
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 28),
-
                       const Text(
                         'GreenHouse Pro',
                         style: TextStyle(
@@ -173,9 +181,7 @@ class _SplashScreenState extends State<SplashScreen>
                           letterSpacing: 0.2,
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       const Text(
                         'Okos üvegház vezérlés',
                         style: TextStyle(
@@ -184,9 +190,7 @@ class _SplashScreenState extends State<SplashScreen>
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-
                       const SizedBox(height: 30),
-
                       Container(
                         width: 180,
                         height: 7,
@@ -213,9 +217,7 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 14),
-
                       Text(
                         'Rendszer indítása...',
                         style: TextStyle(

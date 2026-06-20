@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const authMiddleware = require('../middleware/authMiddleware');
+const deviceMiddleware = require('../middleware/deviceMiddleware');
 
-router.get('/history', async (req, res) => {
+router.get('/history', authMiddleware, async (req, res) => {
   const { hours, days } = req.query;
 
   let interval = '24 hours';
@@ -18,9 +20,10 @@ router.get('/history', async (req, res) => {
   const result = await pool.query(`
     SELECT *
     FROM sensor_data
-    WHERE created_at >= NOW() - INTERVAL '${interval}'
+    WHERE user_id = $1
+    AND created_at >= NOW() - INTERVAL '${interval}'
     ORDER BY created_at ASC
-  `);
+  `, [req.user.id]);
 
   const data = result.rows.map(row => ({
     id: row.id,
@@ -36,13 +39,17 @@ router.get('/history', async (req, res) => {
   res.json(data);
 });
 
-router.get('/', async (req, res) => {
-  const result = await pool.query(`
-    SELECT *
-    FROM sensor_data
-    ORDER BY created_at DESC
-    LIMIT 1
-  `);
+router.get('/', authMiddleware, async (req, res) => {
+  const result = await pool.query(
+    `
+  SELECT *
+  FROM sensor_data
+  WHERE user_id = $1
+  ORDER BY created_at DESC
+  LIMIT 1
+  `,
+    [req.user.id]
+  );
 
   if (result.rows.length === 0) {
     return res.json({
@@ -68,7 +75,7 @@ router.get('/', async (req, res) => {
   });
 });
 
-router.post('/', async (req, res) => {
+router.post('/', deviceMiddleware, async (req, res) => {
   const {
     temperature,
     humidity,
@@ -80,12 +87,30 @@ router.post('/', async (req, res) => {
 
   const result = await pool.query(
     `
-INSERT INTO sensor_data 
-(temperature, humidity, soil_moisture, water_detected, light_on, pump_on)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING *
+    INSERT INTO sensor_data 
+    (
+      user_id,
+      greenhouse_device_id,
+      temperature,
+      humidity,
+      soil_moisture,
+      water_detected,
+      light_on,
+      pump_on
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING *
     `,
-    [temperature, humidity, soilMoisture, waterDetected, lightOn, pumpOn]
+    [
+      req.device.user_id,
+      req.device.id,
+      temperature,
+      humidity,
+      soilMoisture,
+      waterDetected,
+      lightOn,
+      pumpOn,
+    ]
   );
 
   await pool.query(
