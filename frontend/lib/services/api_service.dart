@@ -111,7 +111,8 @@ class ApiService {
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
-      throw Exception('Nem sikerült lekérni az eszközöket. A Beállítások oldalon ellenőrizd az eszköz csatlakozást.');
+      throw Exception(
+          'Nem sikerült lekérni az eszközöket. A Beállítások oldalon ellenőrizd az eszköz csatlakozást.');
     }
   }
 
@@ -427,6 +428,11 @@ class ApiService {
     }
 
     throw Exception('Nem sikerült lekérni a saját eszközöket');
+  }
+
+  static Future<bool> hasClaimedDevice() async {
+    final devices = await getMyDevices();
+    return devices.isNotEmpty;
   }
 
   static Future<Map<String, dynamic>> claimDevice({

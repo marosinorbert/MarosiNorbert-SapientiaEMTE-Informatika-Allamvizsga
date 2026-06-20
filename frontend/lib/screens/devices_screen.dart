@@ -69,6 +69,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
 
   bool _isLoading = true;
   String? _error;
+  bool _hasNoDevice = false;
 
   @override
   Widget build(BuildContext context) {
@@ -76,8 +77,26 @@ class _DevicesScreenState extends State<DevicesScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    if (_hasNoDevice) {
+      return _NoDeviceStateCard(
+        onRefresh: () => _loadDevices(showLoading: true),
+      );
+    }
+
     if (_error != null) {
-      return Center(child: Text(_error!));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      );
     }
 
     return SingleChildScrollView(
@@ -173,11 +192,15 @@ class _DevicesScreenState extends State<DevicesScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDevices();
+    _loadDevices(showLoading: true);
 
     _refreshTimer = Timer.periodic(
       const Duration(seconds: 5),
-      (_) => _loadDevices(),
+      (_) {
+        if (mounted) {
+          _loadDevices();
+        }
+      },
     );
   }
 
