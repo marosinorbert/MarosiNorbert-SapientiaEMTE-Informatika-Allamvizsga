@@ -3,3 +3,4 @@ build/
 .dart_tool/
 .flutter-plugins
 .env
+frontend/macos/Flutter/GeneratedPluginRegistrant.swift
