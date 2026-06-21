@@ -3,6 +3,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 const pool = require('../db');
+const {
+    validateEmail,
+    validateName,
+    validatePassword,
+} = require('../utils/validation');
 
 function createToken(user) {
     return jwt.sign(
@@ -21,15 +26,25 @@ router.post('/register', async (req, res) => {
     try {
         const { name, email, password } = req.body;
 
-        if (!name || !email || !password) {
+        const validationErrors = [
+            validateName(name),
+            validateEmail(email),
+            validatePassword(password),
+        ].filter(Boolean);
+
+        if (validationErrors.length > 0) {
             return res.status(400).json({
-                message: 'Név, email és jelszó megadása kötelező.',
+                message: validationErrors[0],
+                errors: validationErrors,
             });
         }
 
+        const normalizedName = name.toString().trim();
+        const normalizedEmail = email.toString().trim().toLowerCase();
+
         const existing = await pool.query(
             'SELECT id FROM users WHERE email = $1',
-            [email]
+            [normalizedEmail]
         );
 
         if (existing.rows.length > 0) {
@@ -46,7 +61,7 @@ router.post('/register', async (req, res) => {
       VALUES ($1, $2, $3)
       RETURNING id, name, email, created_at
       `,
-            [name, email, passwordHash]
+            [normalizedName, normalizedEmail, passwordHash]
         );
 
         const user = result.rows[0];
@@ -68,9 +83,23 @@ router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        const validationErrors = [
+            validateEmail(email),
+            password ? null : 'Jelszó megadása kötelező.',
+        ].filter(Boolean);
+
+        if (validationErrors.length > 0) {
+            return res.status(400).json({
+                message: validationErrors[0],
+                errors: validationErrors,
+            });
+        }
+
+        const normalizedEmail = email.toString().trim().toLowerCase();
+
         const result = await pool.query(
             'SELECT * FROM users WHERE email = $1',
-            [email]
+            [normalizedEmail]
         );
 
         if (result.rows.length === 0) {

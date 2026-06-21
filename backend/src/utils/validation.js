@@ -88,6 +88,72 @@ function validatePositiveInteger(value, label) {
     return null;
 }
 
+function validateEmail(email) {
+    if (!email || email.toString().trim().length === 0) {
+        return 'Email cím megadása kötelező.';
+    }
+
+    const normalized = email.toString().trim();
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(normalized)) {
+        return 'Érvénytelen email cím formátum.';
+    }
+
+    if (normalized.length > 150) {
+        return 'Az email cím legfeljebb 150 karakter lehet.';
+    }
+
+    return null;
+}
+
+function validateName(name) {
+    if (!name || name.toString().trim().length === 0) {
+        return 'Név megadása kötelező.';
+    }
+
+    const normalized = name.toString().trim();
+
+    if (normalized.length < 2) {
+        return 'A név legalább 2 karakter hosszú kell legyen.';
+    }
+
+    if (normalized.length > 100) {
+        return 'A név legfeljebb 100 karakter lehet.';
+    }
+
+    return null;
+}
+
+function validatePassword(password) {
+    if (!password || password.length === 0) {
+        return 'Jelszó megadása kötelező.';
+    }
+
+    if (password.length < 8) {
+        return 'A jelszónak legalább 8 karakter hosszúnak kell lennie.';
+    }
+
+    if (!/[A-Z]/.test(password)) {
+        return 'A jelszónak tartalmaznia kell legalább 1 nagybetűt.';
+    }
+
+    if (!/[a-z]/.test(password)) {
+        return 'A jelszónak tartalmaznia kell legalább 1 kisbetűt.';
+    }
+
+    if (!/[0-9]/.test(password)) {
+        return 'A jelszónak tartalmaznia kell legalább 1 számot.';
+    }
+
+    if (!/[^A-Za-z0-9]/.test(password)) {
+        return 'A jelszónak tartalmaznia kell legalább 1 speciális karaktert.';
+    }
+
+    return null;
+}
+
 module.exports = {
     isValidNumber,
     toNumber,
@@ -98,4 +164,7 @@ module.exports = {
     validateClaimCode,
     validateTimeString,
     validatePositiveInteger,
+    validateEmail,
+    validateName,
+    validatePassword,
 };
