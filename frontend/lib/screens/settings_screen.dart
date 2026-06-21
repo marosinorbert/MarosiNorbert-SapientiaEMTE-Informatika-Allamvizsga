@@ -67,14 +67,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _mqttBroker = 'mqtt.example.com';
   int _mqttPort = 1883;
 
-  // Sensor calibration
-  double _tempOffset = 0.0;
-  double _tempScale = 1.0;
-  double _humidityOffset = 0.0;
-  double _humidityScale = 1.0;
-  double _soilOffset = 0.0;
-  double _soilScale = 1.0;
-
   // Security
   String _currentPassword = '';
   String _newPassword = '';
@@ -749,78 +741,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 16),
 
-          // Sensor calibration
-          _SettingsSection(
-            title: 'Szenzor kalibrálás',
-            icon: Icons.settings_remote_rounded,
-            children: [
-              _SettingLabel('Hőmérséklet'),
-              Row(
-                children: [
-                  Expanded(
-                    child: _NumberInput(
-                      label: 'Offset',
-                      value: _tempOffset,
-                      onChanged: (v) => setState(() => _tempOffset = v),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _NumberInput(
-                      label: 'Scale',
-                      value: _tempScale,
-                      onChanged: (v) => setState(() => _tempScale = v),
-                      step: 0.1,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _SettingLabel('Páratartalom'),
-              Row(
-                children: [
-                  Expanded(
-                    child: _NumberInput(
-                      label: 'Offset',
-                      value: _humidityOffset,
-                      onChanged: (v) => setState(() => _humidityOffset = v),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _NumberInput(
-                      label: 'Scale',
-                      value: _humidityScale,
-                      onChanged: (v) => setState(() => _humidityScale = v),
-                      step: 0.1,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _SettingLabel('Talajnedvesség'),
-              Row(
-                children: [
-                  Expanded(
-                    child: _NumberInput(
-                      label: 'Offset',
-                      value: _soilOffset,
-                      onChanged: (v) => setState(() => _soilOffset = v),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _NumberInput(
-                      label: 'Scale',
-                      value: _soilScale,
-                      onChanged: (v) => setState(() => _soilScale = v),
-                      step: 0.1,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
           // Automation settings
           _SettingsSection(
             title: 'Automatikus vezérlés',
