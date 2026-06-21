@@ -223,6 +223,52 @@ class _DevicesScreenState extends State<DevicesScreen> {
     );
   }
 
+  double _settingNumber(
+    Map<String, dynamic> settings,
+    String snakeKey,
+    String camelKey,
+    double fallback,
+  ) {
+    final value = settings[snakeKey] ?? settings[camelKey];
+    return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  String _formatNumber(double value) {
+    if (value % 1 == 0) {
+      return value.toInt().toString();
+    }
+
+    return value.toStringAsFixed(1);
+  }
+
+  String _buildAutoCondition(_Device device, Map<String, dynamic> settings) {
+    final tempMin = _settingNumber(settings, 'temp_min', 'tempMin', 18);
+    final tempMax = _settingNumber(settings, 'temp_max', 'tempMax', 28);
+    final soilMin = _settingNumber(settings, 'soil_min', 'soilMin', 35);
+    final soilMax = _settingNumber(settings, 'soil_max', 'soilMax', 80);
+    final lightMin = _settingNumber(settings, 'light_min', 'lightMin', 800);
+
+    switch (device.deviceKey) {
+      case 'pump':
+        return 'Bekapcsol: talajnedvesség < ${_formatNumber(soilMin)}%, '
+            'kikapcsol: ≥ ${_formatNumber(soilMax)}%';
+
+      case 'fan':
+        return 'Bekapcsol: hőmérséklet > ${_formatNumber(tempMax)}°C, '
+            'kikapcsol: ≤ ${_formatNumber(tempMax - 1)}°C';
+
+      case 'heater':
+        return 'Bekapcsol: hőmérséklet < ${_formatNumber(tempMin)}°C, '
+            'kikapcsol: ≥ ${_formatNumber(tempMin + 1)}°C';
+
+      case 'light':
+        return 'Beállított fényhatár: < ${_formatNumber(lightMin)} lux';
+
+      default:
+        return 'Automata feltétel nem elérhető';
+    }
+  }
+
   Future<void> _loadDevices({bool showLoading = false}) async {
     try {
       if (showLoading && mounted) {
@@ -246,6 +292,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
       }
 
       final devicesJson = await ApiService.getDevices();
+      final settingsJson = await ApiService.getSettings();
 
       if (!mounted) return;
 
@@ -296,6 +343,10 @@ class _DevicesScreenState extends State<DevicesScreen> {
             device.scheduleEnabled = scheduleEnabled;
             device.scheduleOn = scheduleOn;
             device.scheduleOff = scheduleOff;
+          }
+
+          for (final device in _devices) {
+            device.autoCondition = _buildAutoCondition(device, settingsJson);
           }
         }
 
@@ -517,7 +568,7 @@ class _Device {
   final int uptimeHours;
   TimeOfDay scheduleOn;
   TimeOfDay scheduleOff;
-  final String autoCondition;
+  String autoCondition;
 
   _Device({
     required this.name,

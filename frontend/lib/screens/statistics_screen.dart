@@ -14,20 +14,6 @@ class _SensorStats {
   _SensorStats({required this.min, required this.max, required this.avg});
 }
 
-class _DeviceStats {
-  final String name;
-  final IconData icon;
-  final int switchCount;
-  final int hoursOn;
-
-  _DeviceStats({
-    required this.name,
-    required this.icon,
-    required this.switchCount,
-    required this.hoursOn,
-  });
-}
-
 class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key});
 
@@ -52,49 +38,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   List<FlSpot> _humiditySpots = [];
   List<FlSpot> _soilSpots = [];
   List<FlSpot> _lightSpots = [];
-
-  List<_DeviceStats> get _deviceStats => [
-        _DeviceStats(
-          name: 'Szellőzés',
-          icon: Icons.air_rounded,
-          switchCount: _timeRange == TimeRange.daily
-              ? 3
-              : (_timeRange == TimeRange.weekly ? 18 : 85),
-          hoursOn: _timeRange == TimeRange.daily
-              ? 8
-              : (_timeRange == TimeRange.weekly ? 52 : 220),
-        ),
-        _DeviceStats(
-          name: 'Öntözőrendszer',
-          icon: Icons.water_drop_rounded,
-          switchCount: _timeRange == TimeRange.daily
-              ? 2
-              : (_timeRange == TimeRange.weekly ? 12 : 58),
-          hoursOn: _timeRange == TimeRange.daily
-              ? 1
-              : (_timeRange == TimeRange.weekly ? 6 : 26),
-        ),
-        _DeviceStats(
-          name: 'Növénylámpa',
-          icon: Icons.light_mode_rounded,
-          switchCount: _timeRange == TimeRange.daily
-              ? 2
-              : (_timeRange == TimeRange.weekly ? 14 : 60),
-          hoursOn: _timeRange == TimeRange.daily
-              ? 14
-              : (_timeRange == TimeRange.weekly ? 98 : 420),
-        ),
-        _DeviceStats(
-          name: 'Fűtés',
-          icon: Icons.local_fire_department_rounded,
-          switchCount: _timeRange == TimeRange.daily
-              ? 0
-              : (_timeRange == TimeRange.weekly ? 2 : 8),
-          hoursOn: _timeRange == TimeRange.daily
-              ? 0
-              : (_timeRange == TimeRange.weekly ? 2 : 18),
-        ),
-      ];
 
   String _timeRangeLabel(TimeRange tr) {
     switch (tr) {
@@ -474,7 +417,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Szenzor adatok és eszköz üzemidő statisztikái',
+            'Szenzor adatok és környezeti értékek statisztikái',
             style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
           ),
 
@@ -603,18 +546,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           ),
 
           const SizedBox(height: 28),
-
-          // Device stats
-          const Text(
-            'Eszköz üzemidő',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _DeviceStatsTable(devices: _deviceStats),
         ],
       ),
     );
@@ -1093,124 +1024,6 @@ class _MiniTrendChart extends StatelessWidget {
               color: color.withOpacity(0.08),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Device Stats Table ───────────────────────────────────
-
-class _DeviceStatsTable extends StatelessWidget {
-  final List<_DeviceStats> devices;
-
-  const _DeviceStatsTable({required this.devices});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          )
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Table(
-        columnWidths: const {
-          0: FlexColumnWidth(2.4),
-          1: FlexColumnWidth(1.2),
-          2: FlexColumnWidth(1.2),
-        },
-        children: [
-          // Header
-          TableRow(
-            decoration: const BoxDecoration(color: AppTheme.primarySurface),
-            children: ['Eszköz', 'Be/ki kapcsolások', 'Üzemidő (h)']
-                .map(
-                  (h) => Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    child: Text(
-                      h,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textSecondary,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-          // Rows
-          ...devices.asMap().entries.map(
-                (e) => TableRow(
-                  decoration: BoxDecoration(
-                    color: e.key.isOdd ? Colors.white : Color(0xFFFAFAFA),
-                    border:
-                        const Border(top: BorderSide(color: AppTheme.border)),
-                  ),
-                  children: [
-                    // Device name
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      child: Row(
-                        children: [
-                          Icon(e.value.icon, size: 16, color: AppTheme.primary),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              e.value.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.textPrimary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Switch count
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      child: Text(
-                        e.value.switchCount.toString(),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                    ),
-                    // Hours on
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      child: Text(
-                        e.value.hoursOn.toString(),
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
         ],
       ),
     );
