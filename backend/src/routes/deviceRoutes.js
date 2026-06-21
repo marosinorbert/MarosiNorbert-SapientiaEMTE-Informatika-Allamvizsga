@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const authMiddleware = require('../middleware/authMiddleware');
+const {
+  validateDeviceName,
+  validateBoolean,
+  validateTimeString,
+} = require('../utils/validation');
 
 async function getUserDevice(req, res) {
   const deviceResult = await pool.query(
@@ -50,6 +55,20 @@ router.post('/:device', authMiddleware, async (req, res) => {
 
   const { device } = req.params;
   const { isOn } = req.body;
+
+  const deviceError = validateDeviceName(device);
+  if (deviceError) {
+    return res.status(400).json({
+      message: deviceError,
+    });
+  }
+
+  const isOnError = validateBoolean(isOn, 'Eszköz állapot');
+  if (isOnError) {
+    return res.status(400).json({
+      message: isOnError,
+    });
+  }
 
   const result = await pool.query(
     `
@@ -113,6 +132,20 @@ router.post('/:device/mode', authMiddleware, async (req, res) => {
 
   const { device } = req.params;
   const { isAuto } = req.body;
+
+  const deviceError = validateDeviceName(device);
+  if (deviceError) {
+    return res.status(400).json({
+      message: deviceError,
+    });
+  }
+
+  const isAutoError = validateBoolean(isAuto, 'Automata mód');
+  if (isAutoError) {
+    return res.status(400).json({
+      message: isAutoError,
+    });
+  }
 
   const result = await pool.query(
     `
@@ -181,6 +214,45 @@ router.post('/:device/schedule', authMiddleware, async (req, res) => {
     scheduleOn,
     scheduleOff,
   } = req.body;
+
+  const deviceError = validateDeviceName(device);
+  if (deviceError) {
+    return res.status(400).json({
+      message: deviceError,
+    });
+  }
+
+  const scheduleEnabledError = validateBoolean(
+    scheduleEnabled,
+    'Ütemezés állapota'
+  );
+
+  if (scheduleEnabledError) {
+    return res.status(400).json({
+      message: scheduleEnabledError,
+    });
+  }
+
+  const scheduleOnError = validateTimeString(scheduleOn, 'Bekapcsolási idő');
+  const scheduleOffError = validateTimeString(scheduleOff, 'Kikapcsolási idő');
+
+  const validationErrors = [
+    scheduleOnError,
+    scheduleOffError,
+  ].filter(Boolean);
+
+  if (validationErrors.length > 0) {
+    return res.status(400).json({
+      message: validationErrors[0],
+      errors: validationErrors,
+    });
+  }
+
+  if (scheduleOn === scheduleOff) {
+    return res.status(400).json({
+      message: 'A bekapcsolási és kikapcsolási idő nem lehet ugyanaz.',
+    });
+  }
 
   const result = await pool.query(
     `

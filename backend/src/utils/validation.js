@@ -56,6 +56,20 @@ function validateClaimCode(claimCode) {
     return null;
 }
 
+function validateTimeString(value, label) {
+    if (!value || typeof value !== 'string') {
+        return `${label}: időpont megadása kötelező.`;
+    }
+
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/;
+
+    if (!timeRegex.test(value)) {
+        return `${label}: érvényes időformátum szükséges, például 08:00.`;
+    }
+
+    return null;
+}
+
 module.exports = {
     isValidNumber,
     toNumber,
@@ -64,4 +78,5 @@ module.exports = {
     validateDeviceName,
     validateBoolean,
     validateClaimCode,
+    validateTimeString,
 };
