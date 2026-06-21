@@ -88,6 +88,33 @@ class ApiService {
     );
   }
 
+  static Future<String> exportSensorDataCsv({
+    bool today = false,
+    int? days,
+  }) async {
+    String url = '$baseUrl/sensors/export/csv';
+
+    if (today) {
+      url += '?today=true';
+    } else {
+      url += '?days=${days ?? 7}';
+    }
+
+    final response = await http.get(
+      Uri.parse(url),
+      headers: await authHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      return utf8.decode(response.bodyBytes);
+    }
+
+    throw Exception(
+      'Nem sikerült exportálni a szenzoradatokat. '
+      'Status: ${response.statusCode}',
+    );
+  }
+
   static Future<void> toggleDevice(String device, bool isOn) async {
     final response = await http.post(
       Uri.parse('$baseUrl/devices/$device'),

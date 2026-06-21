@@ -312,6 +312,8 @@ CREATE TABLE IF NOT EXISTS alerts (
   ADD COLUMN IF NOT EXISTS planted_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 `);
 
+
+
   console.log('Database initialized');
 }
 

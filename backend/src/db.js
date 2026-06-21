@@ -9,4 +9,8 @@ const pool = new Pool({
   database: process.env.DB_NAME,
 });
 
+pool.on('connect', (client) => {
+  client.query("SET TIME ZONE 'Europe/Bucharest'");
+});
+
 module.exports = pool;

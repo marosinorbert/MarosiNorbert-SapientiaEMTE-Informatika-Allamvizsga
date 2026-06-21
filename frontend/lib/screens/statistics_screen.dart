@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 
@@ -40,6 +41,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   bool _isLoading = true;
   String? _error;
   bool _hasNoDevice = false;
+  bool _isExporting = false;
 
   _SensorStats _tempStats = _SensorStats(min: 0, max: 0, avg: 0);
   _SensorStats _humidityStats = _SensorStats(min: 0, max: 0, avg: 0);
@@ -317,6 +319,68 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     }
   }
 
+  Future<void> _exportCsv() async {
+    try {
+      setState(() {
+        _isExporting = true;
+      });
+
+      final hasDevice = await ApiService.hasClaimedDevice();
+
+      if (!mounted) return;
+
+      if (!hasDevice) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'CSV exporthoz először hozzá kell rendelni egy ESP32 eszközt.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final csv = await ApiService.exportSensorDataCsv(
+        today: _timeRange == TimeRange.daily,
+        days: _timeRange == TimeRange.weekly
+            ? 7
+            : _timeRange == TimeRange.monthly
+                ? 30
+                : null,
+      );
+
+      await Clipboard.setData(
+        ClipboardData(text: csv),
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _timeRange == TimeRange.daily
+                ? 'A mai szenzoradatok CSV formátumban a vágólapra kerültek.'
+                : 'A szenzoradatok CSV formátumban a vágólapra kerültek.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Nem sikerült exportálni: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -403,6 +467,33 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                         ),
                       ))
                   .toList(),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _isExporting ? null : _exportCsv,
+              icon: _isExporting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.download_rounded),
+              label: Text(
+                _isExporting ? 'Exportálás...' : 'CSV export vágólapra',
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.primary,
+                side: const BorderSide(color: AppTheme.primary),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
           ),
 
