@@ -50,17 +50,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     }
   }
 
-  int _timeRangeValue(TimeRange tr) {
-    switch (tr) {
-      case TimeRange.daily:
-        return 24;
-      case TimeRange.weekly:
-        return 7;
-      case TimeRange.monthly:
-        return 30;
-    }
-  }
-
   double _toDouble(dynamic value, double fallback) {
     if (value == null) return fallback;
     if (value is num) return value.toDouble();
@@ -138,30 +127,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   void initState() {
     super.initState();
     _loadStatistics(showLoading: true);
-  }
-
-  DateTime? _parseDbDate(dynamic value) {
-    final text = value?.toString();
-
-    if (text == null || text.isEmpty) {
-      return null;
-    }
-
-    return DateTime.tryParse(text.replaceFirst(' ', 'T'));
-  }
-
-  double _xFromDbTime(dynamic value, DateTime start, int fallbackIndex) {
-    final dt = _parseDbDate(value);
-
-    if (dt == null) {
-      return fallbackIndex.toDouble();
-    }
-
-    if (_timeRange == TimeRange.daily) {
-      return dt.hour + (dt.minute / 60.0);
-    }
-
-    return dt.difference(start).inMinutes / 1440.0;
   }
 
   Future<void> _loadStatistics({bool showLoading = false}) async {
@@ -494,7 +459,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: cols == 1 ? 1.25 : 1.05,
+                childAspectRatio: cols == 1 ? 2.45 : 2.2,
                 children: [
                   _StatCard(
                     title: 'Hőmérséklet',
@@ -503,9 +468,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     min: '${tempStats.min.toStringAsFixed(1)}°C',
                     max: '${tempStats.max.toStringAsFixed(1)}°C',
                     avg: '${tempStats.avg.toStringAsFixed(1)}°C',
-                    spots: _tempSpots,
-                    timeRange: _timeRange,
-                    unit: '°C',
                   ),
                   _StatCard(
                     title: 'Páratartalom',
@@ -514,9 +476,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     min: '${humidityStats.min.toInt()}%',
                     max: '${humidityStats.max.toInt()}%',
                     avg: '${humidityStats.avg.toStringAsFixed(1)}%',
-                    spots: _humiditySpots,
-                    timeRange: _timeRange,
-                    unit: '%',
                   ),
                   _StatCard(
                     title: 'Talajnedvesség',
@@ -525,9 +484,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     min: '${soilStats.min.toInt()}%',
                     max: '${soilStats.max.toInt()}%',
                     avg: '${soilStats.avg.toStringAsFixed(1)}%',
-                    spots: _soilSpots,
-                    timeRange: _timeRange,
-                    unit: '%',
                   ),
                   _StatCard(
                     title: 'Fényerő',
@@ -536,15 +492,72 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                     min: '${lightStats.min.toInt()} %',
                     max: '${lightStats.max.toInt()} %',
                     avg: '${lightStats.avg.toInt()} %',
-                    spots: _lightSpots,
-                    timeRange: _timeRange,
-                    unit: '%',
                   ),
                 ],
               );
             },
           ),
+          const SizedBox(height: 28),
 
+          const Text(
+            'Trendek',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          _TrendChart(
+            title: 'Hőmérséklet trend',
+            spots: _tempSpots,
+            timeRange: _timeRange,
+            lineColor: AppTheme.primary,
+            fillColor: AppTheme.primary.withOpacity(0.1),
+            unit: '°C',
+            minY: 0,
+            maxY: 35,
+          ),
+
+          const SizedBox(height: 18),
+
+          _TrendChart(
+            title: 'Páratartalom trend',
+            spots: _humiditySpots,
+            timeRange: _timeRange,
+            lineColor: const Color(0xFF60A5FA),
+            fillColor: const Color(0xFF60A5FA).withOpacity(0.1),
+            unit: '%',
+            minY: 0,
+            maxY: 100,
+          ),
+
+          const SizedBox(height: 18),
+
+          _TrendChart(
+            title: 'Talajnedvesség trend',
+            spots: _soilSpots,
+            timeRange: _timeRange,
+            lineColor: const Color(0xFF8B5CF6),
+            fillColor: const Color(0xFF8B5CF6).withOpacity(0.1),
+            unit: '%',
+            minY: 0,
+            maxY: 100,
+          ),
+
+          const SizedBox(height: 18),
+
+          _TrendChart(
+            title: 'Fényerő trend',
+            spots: _lightSpots,
+            timeRange: _timeRange,
+            lineColor: const Color(0xFFF59E0B),
+            fillColor: const Color(0xFFF59E0B).withOpacity(0.1),
+            unit: '%',
+            minY: 0,
+            maxY: 100,
+          ),
           const SizedBox(height: 28),
         ],
       ),
@@ -692,9 +705,6 @@ class _StatCard extends StatelessWidget {
   final String min;
   final String max;
   final String avg;
-  final List<FlSpot> spots;
-  final TimeRange timeRange;
-  final String unit;
 
   const _StatCard({
     required this.title,
@@ -703,9 +713,6 @@ class _StatCard extends StatelessWidget {
     required this.min,
     required this.max,
     required this.avg,
-    required this.spots,
-    required this.timeRange,
-    required this.unit,
   });
 
   @override
@@ -823,33 +830,43 @@ class _StatCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Expanded(
-            child: _MiniTrendChart(
-              spots: spots,
-              color: color,
-              timeRange: timeRange,
-              unit: unit,
-            ),
-          ),
         ],
       ),
     );
   }
 }
 
-class _MiniTrendChart extends StatelessWidget {
+class _TrendChart extends StatelessWidget {
+  final String title;
   final List<FlSpot> spots;
-  final Color color;
   final TimeRange timeRange;
+  final Color lineColor;
+  final Color fillColor;
   final String unit;
+  final double minY;
+  final double maxY;
 
-  const _MiniTrendChart({
+  const _TrendChart({
+    required this.title,
     required this.spots,
-    required this.color,
     required this.timeRange,
+    required this.lineColor,
+    required this.fillColor,
     required this.unit,
+    required this.minY,
+    required this.maxY,
   });
+
+  String get _rangeLabel {
+    switch (timeRange) {
+      case TimeRange.daily:
+        return 'Utolsó 24 óra';
+      case TimeRange.weekly:
+        return 'Utolsó 7 nap';
+      case TimeRange.monthly:
+        return 'Utolsó 30 nap';
+    }
+  }
 
   double get _maxX {
     switch (timeRange) {
@@ -869,33 +886,40 @@ class _MiniTrendChart extends StatelessWidget {
       case TimeRange.weekly:
         return 1;
       case TimeRange.monthly:
-        return 10;
+        return 5;
     }
   }
 
   String _bottomLabel(double value) {
-    final v = value.round();
+    final v = value.toInt();
 
     switch (timeRange) {
       case TimeRange.daily:
-        return '${v.toString().padLeft(2, '0')}h';
+        if (v == 24) return '';
+        return '${v.toString().padLeft(2, '0')}:00';
       case TimeRange.weekly:
-        return '${v}';
+        if (v == 0) return '';
+        return '$v. nap';
       case TimeRange.monthly:
-        return '${v}';
+        if (v == 0) return '';
+        return '$v';
     }
   }
 
-  String _formatY(double value) {
-    if (unit == 'lux') {
-      return value.toInt().toString();
-    }
+  String _tooltipTime(double x) {
+    switch (timeRange) {
+      case TimeRange.daily:
+        final hour = x.floor();
+        final minute = ((x - hour) * 60).round();
 
-    if (value.abs() >= 100) {
-      return value.toInt().toString();
-    }
+        return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
 
-    return value.toStringAsFixed(1);
+      case TimeRange.weekly:
+        return '${x.toStringAsFixed(1)}. nap';
+
+      case TimeRange.monthly:
+        return '${x.toStringAsFixed(1)}. nap';
+    }
   }
 
   @override
@@ -905,123 +929,153 @@ class _MiniTrendChart extends StatelessWidget {
     final dataMinY = safeSpots.map((e) => e.y).reduce((a, b) => a < b ? a : b);
     final dataMaxY = safeSpots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
 
-    final range = (dataMaxY - dataMinY).abs();
+    final chartMinY = dataMinY < minY ? dataMinY - 5 : minY;
+    final chartMaxY = dataMaxY > maxY ? dataMaxY + 5 : maxY;
 
-    final padding = range == 0
-        ? 2.0
-        : (range * 0.18).clamp(2.0, unit == 'lux' ? 1000.0 : 10.0);
+    final horizontalInterval = (chartMaxY - chartMinY) / 4;
 
-    final minY = dataMinY - padding;
-    final maxY = dataMaxY + padding;
-
-    final yInterval = ((maxY - minY) / 2).abs();
-
-    return LineChart(
-      LineChartData(
-        minX: 0,
-        maxX: _maxX,
-        minY: minY,
-        maxY: maxY,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: yInterval == 0 ? 1 : yInterval,
-          getDrawingHorizontalLine: (value) {
-            return FlLine(
-              color: AppTheme.border.withOpacity(0.6),
-              strokeWidth: 1,
-            );
-          },
-        ),
-        borderData: FlBorderData(
-          show: true,
-          border: Border(
-            left: BorderSide(color: AppTheme.border.withOpacity(0.8)),
-            bottom: BorderSide(color: AppTheme.border.withOpacity(0.8)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-        ),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _rangeLabel,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ],
           ),
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: unit == 'lux' ? 42 : 34,
-              interval: yInterval == 0 ? 1 : yInterval,
-              getTitlesWidget: (value, meta) {
-                final isMin = (value - minY).abs() < yInterval * 0.25;
-                final isMid =
-                    (value - ((minY + maxY) / 2)).abs() < yInterval * 0.25;
-                final isMax = (value - maxY).abs() < yInterval * 0.25;
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 190,
+            child: LineChart(
+              LineChartData(
+                minX: 0,
+                maxX: _maxX,
+                minY: chartMinY,
+                maxY: chartMaxY,
+                lineTouchData: LineTouchData(
+                  enabled: true,
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        final value = spot.y.toStringAsFixed(1);
+                        final time = _tooltipTime(spot.x);
 
-                if (!isMin && !isMid && !isMax) {
-                  return const SizedBox.shrink();
-                }
-
-                return Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: Text(
-                    _formatY(value),
-                    style: const TextStyle(
-                      fontSize: 9,
-                      color: AppTheme.textSecondary,
-                      fontWeight: FontWeight.w500,
+                        return LineTooltipItem(
+                          '$value $unit / $time',
+                          const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        );
+                      }).toList();
+                    },
+                  ),
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval:
+                      horizontalInterval == 0 ? 1 : horizontalInterval,
+                  getDrawingHorizontalLine: (_) => const FlLine(
+                    color: Color(0xFFF0F0F0),
+                    strokeWidth: 1,
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                titlesData: FlTitlesData(
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval:
+                          horizontalInterval == 0 ? 1 : horizontalInterval,
+                      reservedSize: 34,
+                      getTitlesWidget: (value, _) => Text(
+                        value.toInt().toString(),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              interval: _bottomInterval,
-              getTitlesWidget: (value, meta) {
-                if (value < 0 || value > _maxX) {
-                  return const SizedBox.shrink();
-                }
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: _bottomInterval,
+                      reservedSize: 32,
+                      getTitlesWidget: (value, _) {
+                        final label = _bottomLabel(value);
 
-                final rounded = value.round();
+                        if (label.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
 
-                if ((value - rounded).abs() > 0.01) {
-                  return const SizedBox.shrink();
-                }
-
-                if (timeRange == TimeRange.daily && rounded == 24) {
-                  return const SizedBox.shrink();
-                }
-
-                return Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    _bottomLabel(value),
-                    style: const TextStyle(
-                      fontSize: 9,
-                      color: AppTheme.textSecondary,
-                      fontWeight: FontWeight.w500,
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            label,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-        ),
-        lineTouchData: const LineTouchData(enabled: false),
-        lineBarsData: [
-          LineChartBarData(
-            spots: safeSpots,
-            isCurved: true,
-            color: color,
-            barWidth: 2,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              color: color.withOpacity(0.08),
+                ),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: safeSpots,
+                    isCurved: true,
+                    color: lineColor,
+                    barWidth: 2.5,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: fillColor,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

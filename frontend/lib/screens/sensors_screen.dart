@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../theme/app_theme.dart';
 import '../utils/responsive.dart';
 import '../services/api_service.dart';
+import '../widgets/chart_card.dart';
 
 class SensorsScreen extends StatefulWidget {
   const SensorsScreen({super.key});
@@ -42,6 +43,22 @@ class _SensorsScreenState extends State<SensorsScreen> {
     }
 
     return dt.hour + (dt.minute / 60.0);
+  }
+
+  double _hourFromCreatedAt(dynamic value, int fallbackIndex) {
+    final text = value?.toString();
+
+    if (text == null || text.isEmpty) {
+      return fallbackIndex.toDouble();
+    }
+
+    final parsed = DateTime.tryParse(text.replaceFirst(' ', 'T'));
+
+    if (parsed == null) {
+      return fallbackIndex.toDouble();
+    }
+
+    return parsed.hour + (parsed.minute / 60.0);
   }
 
   Future<void> _loadSensorData({bool showLoading = false}) async {
@@ -115,7 +132,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
       for (int i = 0; i < historyJson.length; i++) {
         final item = historyJson[i];
 
-        final hour = _hourFromDbTime(
+        final hour = _hourFromCreatedAt(
           item['createdAtFormatted'] ?? item['createdAt'] ?? item['created_at'],
           i,
         );
@@ -286,59 +303,38 @@ class _SensorsScreenState extends State<SensorsScreen> {
 
           const SizedBox(height: 24),
 
-          const Text(
-            'Hőmérséklet — 24 órás trend',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _buildChart(
+          ChartCard(
+            title: 'Hőmérséklet — 24 órás trend',
             spots: _tempSpots.isEmpty ? [const FlSpot(0, 0)] : _tempSpots,
             lineColor: AppTheme.primary,
             fillColor: AppTheme.primary.withOpacity(0.1),
             minY: 0,
             maxY: 30,
+            unit: '°C',
           ),
 
           const SizedBox(height: 24),
 
-          const Text(
-            'Talajnedvesség — 24 órás trend',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _buildChart(
+          ChartCard(
+            title: 'Talajnedvesség — 24 órás trend',
             spots: _soilSpots.isEmpty ? [const FlSpot(0, 0)] : _soilSpots,
             lineColor: const Color(0xFF8B5CF6),
             fillColor: const Color(0xFF8B5CF6).withOpacity(0.1),
             minY: 0,
-            maxY: 80,
+            maxY: 100,
+            unit: '%',
           ),
 
           const SizedBox(height: 24),
 
-          const Text(
-            'Fényerő — 24 órás trend',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _buildChart(
+          ChartCard(
+            title: 'Fényerő — 24 órás trend',
             spots: _lightSpots.isEmpty ? [const FlSpot(0, 0)] : _lightSpots,
             lineColor: const Color(0xFFF59E0B),
             fillColor: const Color(0xFFF59E0B).withOpacity(0.1),
             minY: 0,
             maxY: 100,
+            unit: '%',
           ),
 
           const SizedBox(height: 24),
@@ -356,116 +352,6 @@ class _SensorsScreenState extends State<SensorsScreen> {
 
           const SizedBox(height: 28),
         ],
-      ),
-    );
-  }
-
-  static Widget _buildChart({
-    required List<FlSpot> spots,
-    required Color lineColor,
-    required Color fillColor,
-    required double minY,
-    required double maxY,
-  }) {
-    final safeSpots = spots.isEmpty ? [const FlSpot(0, 0)] : spots;
-
-    final dataMinY = safeSpots.map((e) => e.y).reduce((a, b) => a < b ? a : b);
-    final dataMaxY = safeSpots.map((e) => e.y).reduce((a, b) => a > b ? a : b);
-
-    final chartMinY = ((dataMinY < minY ? dataMinY : minY) - 5).floorToDouble();
-
-    final chartMaxY = ((dataMaxY > maxY ? dataMaxY : maxY) + 5).ceilToDouble();
-
-    final double chartInterval =
-        (chartMaxY - chartMinY) == 0 ? 1.0 : (chartMaxY - chartMinY) / 4.0;
-
-    return Container(
-      height: 160,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          )
-        ],
-      ),
-      child: LineChart(
-        LineChartData(
-          minX: 0,
-          maxX: 24,
-          minY: chartMinY,
-          maxY: chartMaxY,
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            horizontalInterval: chartInterval,
-            getDrawingHorizontalLine: (_) =>
-                const FlLine(color: Color(0xFFF0F0F0), strokeWidth: 1),
-          ),
-          borderData: FlBorderData(show: false),
-          titlesData: FlTitlesData(
-            rightTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: chartInterval,
-                reservedSize: 32,
-                getTitlesWidget: (v, _) => Text(
-                  v.toInt().toString(),
-                  style: const TextStyle(
-                      fontSize: 11, color: AppTheme.textSecondary),
-                ),
-              ),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                interval: 6.0,
-                reservedSize: 30,
-                getTitlesWidget: (v, _) {
-                  final hour = v.toInt();
-
-                  if (hour < 0 || hour > 24) {
-                    return const SizedBox.shrink();
-                  }
-
-                  if (hour == 24) {
-                    return const SizedBox.shrink();
-                  }
-
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      '${hour.toString().padLeft(2, '0')}:00',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          lineBarsData: [
-            LineChartBarData(
-              spots: safeSpots,
-              isCurved: true,
-              color: lineColor,
-              barWidth: 2.5,
-              dotData: const FlDotData(show: false),
-              belowBarData: BarAreaData(show: true, color: fillColor),
-            ),
-          ],
-        ),
       ),
     );
   }
