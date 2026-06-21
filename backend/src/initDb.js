@@ -312,7 +312,142 @@ CREATE TABLE IF NOT EXISTS alerts (
   ADD COLUMN IF NOT EXISTS planted_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 `);
 
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'sensor_data'
+        AND column_name = 'created_at'
+        AND data_type = 'timestamp without time zone'
+      ) THEN
+        ALTER TABLE sensor_data
+        ALTER COLUMN created_at TYPE TIMESTAMPTZ
+        USING created_at AT TIME ZONE 'UTC';
+      END IF;
 
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'device_state'
+        AND column_name = 'updated_at'
+        AND data_type = 'timestamp without time zone'
+      ) THEN
+        ALTER TABLE device_state
+        ALTER COLUMN updated_at TYPE TIMESTAMPTZ
+        USING updated_at AT TIME ZONE 'UTC';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'greenhouse_devices'
+        AND column_name = 'created_at'
+        AND data_type = 'timestamp without time zone'
+      ) THEN
+        ALTER TABLE greenhouse_devices
+        ALTER COLUMN created_at TYPE TIMESTAMPTZ
+        USING created_at AT TIME ZONE 'UTC';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'greenhouse_devices'
+        AND column_name = 'claimed_at'
+        AND data_type = 'timestamp without time zone'
+      ) THEN
+        ALTER TABLE greenhouse_devices
+        ALTER COLUMN claimed_at TYPE TIMESTAMPTZ
+        USING claimed_at AT TIME ZONE 'UTC';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'system_settings'
+        AND column_name = 'updated_at'
+        AND data_type = 'timestamp without time zone'
+      ) THEN
+        ALTER TABLE system_settings
+        ALTER COLUMN updated_at TYPE TIMESTAMPTZ
+        USING updated_at AT TIME ZONE 'UTC';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'esp32_status'
+        AND column_name = 'last_seen'
+        AND data_type = 'timestamp without time zone'
+      ) THEN
+        ALTER TABLE esp32_status
+        ALTER COLUMN last_seen TYPE TIMESTAMPTZ
+        USING last_seen AT TIME ZONE 'UTC';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'alerts'
+        AND column_name = 'created_at'
+        AND data_type = 'timestamp without time zone'
+      ) THEN
+        ALTER TABLE alerts
+        ALTER COLUMN created_at TYPE TIMESTAMPTZ
+        USING created_at AT TIME ZONE 'UTC';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'system_logs'
+        AND column_name = 'created_at'
+        AND data_type = 'timestamp without time zone'
+      ) THEN
+        ALTER TABLE system_logs
+        ALTER COLUMN created_at TYPE TIMESTAMPTZ
+        USING created_at AT TIME ZONE 'UTC';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'plants'
+        AND column_name = 'planted_date'
+        AND data_type = 'timestamp without time zone'
+      ) THEN
+        ALTER TABLE plants
+        ALTER COLUMN planted_date TYPE TIMESTAMPTZ
+        USING planted_date AT TIME ZONE 'UTC';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'plants'
+        AND column_name = 'created_at'
+        AND data_type = 'timestamp without time zone'
+      ) THEN
+        ALTER TABLE plants
+        ALTER COLUMN created_at TYPE TIMESTAMPTZ
+        USING created_at AT TIME ZONE 'UTC';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'plants'
+        AND column_name = 'updated_at'
+        AND data_type = 'timestamp without time zone'
+      ) THEN
+        ALTER TABLE plants
+        ALTER COLUMN updated_at TYPE TIMESTAMPTZ
+        USING updated_at AT TIME ZONE 'UTC';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'users'
+        AND column_name = 'created_at'
+        AND data_type = 'timestamp without time zone'
+      ) THEN
+        ALTER TABLE users
+        ALTER COLUMN created_at TYPE TIMESTAMPTZ
+        USING created_at AT TIME ZONE 'UTC';
+      END IF;
+    END $$;
+  `);
 
   console.log('Database initialized');
 }
