@@ -62,6 +62,98 @@ function mapSensorRow(row) {
   };
 }
 
+function escapeCsv(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  const stringValue = value.toString();
+
+  if (
+    stringValue.includes(';') ||
+    stringValue.includes('"') ||
+    stringValue.includes('\n')
+  ) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+
+  return stringValue;
+}
+
+router.get('/export/csv', authMiddleware, async (req, res) => {
+  const { days, today } = req.query;
+
+  let result;
+
+  if (today === 'true') {
+    result = await pool.query(
+      `
+      SELECT *
+      FROM sensor_data
+      WHERE user_id = $1
+      AND created_at >= CURRENT_DATE
+      AND created_at < CURRENT_DATE + INTERVAL '1 day'
+      ORDER BY created_at ASC
+      `,
+      [req.user.id]
+    );
+  } else {
+    const parsedDays = Math.max(parseInt(days, 10) || 7, 1);
+
+    result = await pool.query(
+      `
+      SELECT *
+      FROM sensor_data
+      WHERE user_id = $1
+      AND created_at >= NOW() - ($2 * INTERVAL '1 day')
+      ORDER BY created_at ASC
+      `,
+      [req.user.id, parsedDays]
+    );
+  }
+
+  const header = [
+    'id',
+    'datum',
+    'homerseklet_c',
+    'paratartalom_szazalek',
+    'talajnedvesseg_szazalek',
+    'viz_elerheto',
+    'lampa_bekapcsolva',
+    'pumpa_bekapcsolva',
+  ];
+
+  const rows = result.rows.map((row) => [
+    row.id,
+    row.created_at,
+    row.temperature,
+    row.humidity,
+    row.soil_moisture,
+    row.water_detected,
+    row.light_on,
+    row.pump_on,
+  ]);
+
+  const csvLines = [
+    header.join(';'),
+    ...rows.map((row) => row.map(escapeCsv).join(';')),
+  ];
+
+  const csvContent = `\uFEFF${csvLines.join('\n')}`;
+
+  const fileName = today === 'true'
+    ? 'szenzoradatok_ma.csv'
+    : `szenzoradatok_${days || 7}_nap.csv`;
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${fileName}"`
+  );
+
+  res.send(csvContent);
+});
+
 router.get('/history', authMiddleware, async (req, res) => {
   const { hours, days, today } = req.query;
 
