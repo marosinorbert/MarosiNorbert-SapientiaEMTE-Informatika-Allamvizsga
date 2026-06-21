@@ -40,7 +40,7 @@ async function getOrCreateSettings(userId) {
       language,
       temp_unit
     )
-    VALUES ($1, 18, 28, 50, 75, 35, 80, 800, 3000, false, 'hu', '°C')
+    VALUES ($1, 18, 28, 50, 75, 35, 80, 30, 80, false, 'hu', '°C')
     RETURNING *
     `,
     [userId]
@@ -59,6 +59,8 @@ function mapSensorRow(row) {
     temperature: Number(row.temperature),
     humidity: Number(row.humidity),
     soilMoisture: Number(row.soil_moisture),
+    lightIntensity: Number(row.light_intensity ?? 0),
+    lightRaw: Number(row.light_raw ?? 0),
     waterAvailable: row.water_detected,
     lightOn: row.light_on,
     pumpOn: row.pump_on,
@@ -125,6 +127,8 @@ router.get('/export/csv', authMiddleware, async (req, res) => {
     'homerseklet_c',
     'paratartalom_szazalek',
     'talajnedvesseg_szazalek',
+    'fenyerosseg_szazalek',
+    'fenyerosseg_raw',
     'viz_elerheto',
     'lampa_bekapcsolva',
     'pumpa_bekapcsolva',
@@ -136,6 +140,8 @@ router.get('/export/csv', authMiddleware, async (req, res) => {
     row.temperature,
     row.humidity,
     row.soil_moisture,
+    row.light_intensity,
+    row.light_raw,
     row.water_detected,
     row.light_on,
     row.pump_on,
@@ -232,6 +238,8 @@ router.get('/', authMiddleware, async (req, res) => {
       temperature: 0,
       humidity: 0,
       soilMoisture: 0,
+      lightIntensity: 0,
+      lightRaw: 0,
       waterAvailable: true,
       lightOn: false,
       pumpOn: false,
@@ -249,6 +257,8 @@ router.post('/', deviceMiddleware, async (req, res) => {
     temperature,
     humidity,
     soilMoisture,
+    lightIntensity = 0,
+    lightRaw = 0,
     waterDetected = true,
     lightOn = false,
     pumpOn = false,
@@ -279,6 +289,24 @@ router.post('/', deviceMiddleware, async (req, res) => {
     validationErrors.push('A talajnedvesség 0 és 100 között lehet.');
   }
 
+  if (!isValidNumber(lightIntensity)) {
+    validationErrors.push('A fényerő értéke kötelező és szám kell legyen.');
+  }
+
+  if (
+    isValidNumber(lightIntensity) &&
+    (Number(lightIntensity) < 0 || Number(lightIntensity) > 100)
+  ) {
+    validationErrors.push('A fényerő 0 és 100 között lehet.');
+  }
+
+  if (
+    isValidNumber(lightRaw) &&
+    (Number(lightRaw) < 0 || Number(lightRaw) > 4095)
+  ) {
+    validationErrors.push('A nyers fényerő érték 0 és 4095 között lehet.');
+  }
+
   const waterDetectedError = validateBoolean(waterDetected, 'Víztartály állapot');
   const lightOnError = validateBoolean(lightOn, 'Lámpa állapot');
   const pumpOnError = validateBoolean(pumpOn, 'Pumpa állapot');
@@ -303,11 +331,13 @@ router.post('/', deviceMiddleware, async (req, res) => {
       temperature,
       humidity,
       soil_moisture,
+      light_intensity,
+      light_raw,
       water_detected,
       light_on,
       pump_on
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING *
     `,
     [
@@ -316,6 +346,8 @@ router.post('/', deviceMiddleware, async (req, res) => {
       temperature,
       humidity,
       soilMoisture,
+      lightIntensity,
+      lightRaw,
       waterDetected,
       lightOn,
       pumpOn,
@@ -338,7 +370,7 @@ router.post('/', deviceMiddleware, async (req, res) => {
       greenhouseDeviceId,
       'sensor',
       'Új szenzoradat érkezett',
-      `Hőmérséklet: ${temperature}°C, páratartalom: ${humidity}%, talajnedvesség: ${soilMoisture}%.`,
+      `Hőmérséklet: ${temperature}°C, páratartalom: ${humidity}%, talajnedvesség: ${soilMoisture}%, fényerő: ${lightIntensity}%.`,
     ]
   );
 
@@ -539,6 +571,29 @@ router.post('/', deviceMiddleware, async (req, res) => {
 
   if (temperature >= Number(settings.temp_min) + 1) {
     await updateDeviceStateIfAuto('heater', false);
+  }
+
+  // Lámpa automatika
+  if (Number(lightIntensity) < Number(settings.light_min)) {
+    await updateDeviceStateIfAuto('light', true);
+
+    await createAlertIfNeeded(
+      'Automatikus világítás bekapcsolva',
+      `A fényerő ${lightIntensity}%, ezért a rendszer bekapcsolta a növénylámpát.`,
+      'warning',
+      'Fényerő'
+    );
+  }
+
+  if (Number(lightIntensity) >= Number(settings.light_max)) {
+    await updateDeviceStateIfAuto('light', false);
+
+    await createAlertIfNeeded(
+      'Automatikus világítás kikapcsolva',
+      `A fényerő ${lightIntensity}%, ezért a rendszer kikapcsolta a növénylámpát.`,
+      'ok',
+      'Fényerő'
+    );
   }
 
   res.status(201).json({

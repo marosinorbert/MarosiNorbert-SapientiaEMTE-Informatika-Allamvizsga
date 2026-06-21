@@ -66,6 +66,16 @@ async function initDb() {
 `);
 
   await pool.query(`
+  ALTER TABLE sensor_data
+  ADD COLUMN IF NOT EXISTS light_intensity NUMERIC(5,2) DEFAULT 0;
+`);
+
+  await pool.query(`
+  ALTER TABLE sensor_data
+  ADD COLUMN IF NOT EXISTS light_raw INTEGER DEFAULT 0;
+`);
+
+  await pool.query(`
   CREATE TABLE IF NOT EXISTS device_state (
     id SERIAL PRIMARY KEY,
     device_name VARCHAR(50) NOT NULL,
@@ -128,8 +138,8 @@ async function initDb() {
     soil_min NUMERIC(5,2) DEFAULT 35,
     soil_max NUMERIC(5,2) DEFAULT 80,
 
-    light_min NUMERIC(8,2) DEFAULT 800,
-    light_max NUMERIC(8,2) DEFAULT 3000,
+    light_min NUMERIC(5,2) DEFAULT 30,
+    light_max NUMERIC(5,2) DEFAULT 80,
 
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
   );
@@ -165,8 +175,8 @@ async function initDb() {
     75,
     35,
     80,
-    800,
-    3000
+    30,
+    80
   )
   ON CONFLICT (id) DO NOTHING;
 `);
@@ -284,8 +294,8 @@ CREATE TABLE IF NOT EXISTS alerts (
     soil_min NUMERIC(5,2) DEFAULT 35,
     soil_max NUMERIC(5,2) DEFAULT 80,
 
-    light_min NUMERIC(8,2) DEFAULT 800,
-    light_max NUMERIC(8,2) DEFAULT 3000,
+    light_min NUMERIC(5,2) DEFAULT 30,
+    light_max NUMERIC(5,2) DEFAULT 80,
 
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -447,6 +457,14 @@ CREATE TABLE IF NOT EXISTS alerts (
         USING created_at AT TIME ZONE 'Europe/Bucharest';
       END IF;
     END $$;
+  `);
+
+  await pool.query(`
+    UPDATE system_settings
+    SET light_min = 30,
+        light_max = 80
+    WHERE light_min > 100
+    OR light_max > 100;
   `);
 
   console.log('Database initialized');

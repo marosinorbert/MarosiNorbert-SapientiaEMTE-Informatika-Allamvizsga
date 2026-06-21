@@ -17,7 +17,7 @@ class SensorData {
         temperature: 24.5,
         humidity: 62,
         soilMoisture: 45,
-        lightIntensity: 12500,
+        lightIntensity: 0,
         lastUpdated: 'Last seen over 1 year ago',
       );
 }

@@ -113,8 +113,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _humidityMax = 75;
   double _soilMin = 35;
   double _soilMax = 80;
-  double _lightMin = 800;
-  double _lightMax = 3000;
+  double _lightMin = 30;
+  double _lightMax = 80;
 
   double _toDouble(dynamic value, double fallback) {
     if (value == null) return fallback;
@@ -273,14 +273,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _soilMin = _toDouble(settingsJson['soil_min'], 35);
         _soilMax = _toDouble(settingsJson['soil_max'], 80);
 
-        _lightMin = _toDouble(settingsJson['light_min'], 800);
-        _lightMax = _toDouble(settingsJson['light_max'], 3000);
+        _lightMin = _toDouble(settingsJson['light_min'], 30);
+        _lightMax = _toDouble(settingsJson['light_max'], 80);
 
         _data = SensorData(
           temperature: (latestJson['temperature'] ?? 0).toDouble(),
           humidity: (latestJson['humidity'] ?? 0).toDouble(),
           soilMoisture: (latestJson['soilMoisture'] ?? 0).toDouble(),
-          lightIntensity: 0,
+          lightIntensity: _toDouble(
+            latestJson['lightIntensity'] ?? latestJson['light_intensity'],
+            0,
+          ),
           lastUpdated: latestJson['createdAtFormatted'] ??
               latestJson['createdAt']?.toString() ??
               'Most',
@@ -483,9 +486,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               StatCard(
                 title: 'Fényerősség',
                 value: '${_data.lightIntensity.toInt()}',
-                unit: 'lux',
-                subtitle:
-                    'Cél: ${_lightMin.toInt()} - ${_lightMax.toInt()} lux',
+                unit: '%',
+                subtitle: 'Cél: ${_lightMin.toInt()}% - ${_lightMax.toInt()}%',
                 icon: Icons.wb_sunny_rounded,
               ),
             ],

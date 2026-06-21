@@ -20,6 +20,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
 
   List<FlSpot> _tempSpots = [];
   List<FlSpot> _soilSpots = [];
+  List<FlSpot> _lightSpots = [];
 
   @override
   void initState() {
@@ -64,6 +65,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
           _sensors = [];
           _tempSpots = [];
           _soilSpots = [];
+          _lightSpots = [];
         });
         return;
       }
@@ -74,6 +76,11 @@ class _SensorsScreenState extends State<SensorsScreen> {
       final temperature = (latestJson['temperature'] ?? 0).toDouble();
       final humidity = (latestJson['humidity'] ?? 0).toDouble();
       final soilMoisture = (latestJson['soilMoisture'] ?? 0).toDouble();
+      final lightIntensity = ((latestJson['lightIntensity'] ??
+              latestJson['light_intensity'] ??
+              0) as num)
+          .toDouble();
+      final lightRaw = latestJson['lightRaw'] ?? latestJson['light_raw'] ?? 0;
 
       final tempValues = historyJson
           .map<double>((item) => (item['temperature'] ?? 0).toDouble())
@@ -81,6 +88,14 @@ class _SensorsScreenState extends State<SensorsScreen> {
 
       final soilValues = historyJson
           .map<double>((item) => (item['soilMoisture'] ?? 0).toDouble())
+          .toList();
+
+      final lightValues = historyJson
+          .map<double>(
+            (item) => ((item['lightIntensity'] ?? item['light_intensity'] ?? 0)
+                    as num)
+                .toDouble(),
+          )
           .toList();
 
       double minValue(List<double> values, double fallback) =>
@@ -95,6 +110,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
 
       final tempSpots = <FlSpot>[];
       final soilSpots = <FlSpot>[];
+      final lightSpots = <FlSpot>[];
 
       for (int i = 0; i < historyJson.length; i++) {
         final item = historyJson[i];
@@ -115,6 +131,14 @@ class _SensorsScreenState extends State<SensorsScreen> {
           FlSpot(
             hour,
             (item['soilMoisture'] ?? 0).toDouble(),
+          ),
+        );
+
+        lightSpots.add(
+          FlSpot(
+            hour,
+            ((item['lightIntensity'] ?? item['light_intensity'] ?? 0) as num)
+                .toDouble(),
           ),
         );
       }
@@ -152,19 +176,23 @@ class _SensorsScreenState extends State<SensorsScreen> {
             pin: 'GPIO 34',
           ),
           _SensorInfo(
-            name: 'Fényszenzor',
+            name: 'LDR5537 — Fényerő',
             icon: Icons.wb_sunny_rounded,
-            value: '0 lux',
-            min: '-',
-            max: '-',
-            avg: '-',
-            status: 'offline',
-            pin: 'GPIO 21/22',
+            value: '${lightIntensity.toStringAsFixed(0)} %',
+            min:
+                '${minValue(lightValues, lightIntensity).toStringAsFixed(0)} %',
+            max:
+                '${maxValue(lightValues, lightIntensity).toStringAsFixed(0)} %',
+            avg:
+                '${avgValue(lightValues, lightIntensity).toStringAsFixed(0)} %',
+            status: 'online',
+            pin: 'GPIO 4 | raw: $lightRaw',
           ),
         ];
 
         _tempSpots = tempSpots;
         _soilSpots = soilSpots;
+        _lightSpots = lightSpots;
 
         _isLoading = false;
         _hasNoDevice = false;
@@ -292,6 +320,25 @@ class _SensorsScreenState extends State<SensorsScreen> {
             fillColor: const Color(0xFF8B5CF6).withOpacity(0.1),
             minY: 0,
             maxY: 80,
+          ),
+
+          const SizedBox(height: 24),
+
+          const Text(
+            'Fényerő — 24 órás trend',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          _buildChart(
+            spots: _lightSpots.isEmpty ? [const FlSpot(0, 0)] : _lightSpots,
+            lineColor: const Color(0xFFF59E0B),
+            fillColor: const Color(0xFFF59E0B).withOpacity(0.1),
+            minY: 0,
+            maxY: 100,
           ),
 
           const SizedBox(height: 24),

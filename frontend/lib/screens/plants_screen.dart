@@ -54,8 +54,8 @@ class Plant {
       idealHumidityMax: toDouble(json['humidity_max'], 75),
       idealSoilMin: toDouble(json['soil_min'], 35),
       idealSoilMax: toDouble(json['soil_max'], 80),
-      idealLightMin: toDouble(json['light_min'], 800),
-      idealLightMax: toDouble(json['light_max'], 3000),
+      idealLightMin: toDouble(json['light_min'], 30),
+      idealLightMax: toDouble(json['light_max'], 80),
     );
   }
 }
@@ -153,7 +153,7 @@ class _PlantsScreenState extends State<PlantsScreen> {
         _currentTemp = _toDouble(data['temperature'], 0);
         _currentHumidity = _toDouble(data['humidity'], 0);
         _currentSoil = _toDouble(data['soilMoisture'], 0);
-        _currentLight = _toDouble(data['lightIntensity'], 0);
+        _currentLight = _toDouble(data['lightIntensity'] ?? data['light_intensity'], 0);
       });
     } catch (e) {
       if (!mounted) return;
@@ -263,10 +263,10 @@ class _PlantsScreenState extends State<PlantsScreen> {
     );
 
     final lightMinCtrl = TextEditingController(
-      text: (plant?.idealLightMin ?? 5000).toStringAsFixed(0),
+      text: (plant?.idealLightMin ?? 30).toStringAsFixed(0),
     );
     final lightMaxCtrl = TextEditingController(
-      text: (plant?.idealLightMax ?? 30000).toStringAsFixed(0),
+      text: (plant?.idealLightMax ?? 80).toStringAsFixed(0),
     );
 
     String selectedEmoji = plant?.emoji ?? '🌱';
@@ -428,7 +428,7 @@ class _PlantsScreenState extends State<PlantsScreen> {
                     Expanded(
                       child: _DialogField(
                         controller: lightMinCtrl,
-                        hint: 'Fény min lux',
+                        hint: 'Fény min %',
                         keyboardType: TextInputType.number,
                       ),
                     ),
@@ -436,7 +436,7 @@ class _PlantsScreenState extends State<PlantsScreen> {
                     Expanded(
                       child: _DialogField(
                         controller: lightMaxCtrl,
-                        hint: 'Fény max lux',
+                        hint: 'Fény max %',
                         keyboardType: TextInputType.number,
                       ),
                     ),
@@ -651,7 +651,7 @@ class _PlantsScreenState extends State<PlantsScreen> {
                     icon: Icons.eco_rounded,
                   ),
                   _SensorBadge(
-                    label: '${_currentLight.toInt()} lux',
+                    label: '${_currentLight.toInt()} %',
                     icon: Icons.wb_sunny_rounded,
                   ),
                 ],
@@ -921,9 +921,9 @@ class _PlantCard extends StatelessWidget {
                   _CompareRow(
                     icon: Icons.wb_sunny_rounded,
                     label: 'Fényerő',
-                    current: '${currentLight.toInt()} lux',
+                    current: '${currentLight.toInt()} %',
                     ideal:
-                        '${plant.idealLightMin.toInt()}–${plant.idealLightMax.toInt()} lux',
+                        '${plant.idealLightMin.toInt()}–${plant.idealLightMax.toInt()} %',
                     isOk: lightOk,
                     hasMeasurement: hasDevice,
                   ),

@@ -29,8 +29,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   double _humidityMax = 75;
   double _soilMin = 35;
   double _soilMax = 80;
-  double _lightMin = 800;
-  double _lightMax = 3000;
+  double _lightMin = 30;
+  double _lightMax = 80;
 
   @override
   void initState() {
@@ -131,8 +131,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _soilMin = _toDouble(settings['soil_min'], 35);
         _soilMax = _toDouble(settings['soil_max'], 80);
 
-        _lightMin = _toDouble(settings['light_min'], 800);
-        _lightMax = _toDouble(settings['light_max'], 3000);
+        _lightMin = _toDouble(settings['light_min'], 30);
+        _lightMax = _toDouble(settings['light_max'], 80);
 
         _darkMode = settings['dark_mode'] ?? false;
         _language = settings['language'] ?? 'hu';
@@ -934,7 +934,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              _SettingLabel('Fényerősség (lux)'),
+              _SettingLabel('Fényerősség (%)'),
               Row(
                 children: [
                   Expanded(

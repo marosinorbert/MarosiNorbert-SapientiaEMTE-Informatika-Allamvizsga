@@ -55,7 +55,7 @@ async function getOrCreateSettings(userId) {
       language,
       temp_unit
     )
-    VALUES ($1, 18, 28, 50, 75, 35, 80, 800, 3000, false, 'hu', '°C')
+    VALUES ($1, 18, 28, 50, 75, 35, 80, 30, 80, false, 'hu', '°C')
     RETURNING *
     `,
     [userId]
@@ -113,6 +113,12 @@ router.post('/', authMiddleware, async (req, res) => {
   if (!['°C', '°F'].includes(tempUnit)) {
     return res.status(400).json({
       message: 'Érvénytelen hőmérséklet mértékegység.',
+    });
+  }
+
+  if (Number(lightMin) < 0 || Number(lightMax) > 100) {
+    return res.status(400).json({
+      message: 'A fényerő értékei 0 és 100 között lehetnek.',
     });
   }
 
