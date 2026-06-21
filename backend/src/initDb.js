@@ -7,7 +7,7 @@ async function initDb() {
     name VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
@@ -19,8 +19,8 @@ async function initDb() {
       device_token TEXT UNIQUE NOT NULL,
       user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       is_claimed BOOLEAN DEFAULT false,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      claimed_at TIMESTAMP
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      claimed_at TIMESTAMPTZ
     );
   `);
 
@@ -46,7 +46,7 @@ async function initDb() {
       soil_moisture NUMERIC(5,2),
       light_on BOOLEAN DEFAULT false,
       pump_on BOOLEAN DEFAULT false,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
@@ -71,7 +71,7 @@ async function initDb() {
     device_name VARCHAR(50) NOT NULL,
     is_on BOOLEAN DEFAULT FALSE,
     is_auto BOOLEAN DEFAULT TRUE,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
@@ -131,7 +131,7 @@ async function initDb() {
     light_min NUMERIC(8,2) DEFAULT 800,
     light_max NUMERIC(8,2) DEFAULT 3000,
 
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
@@ -199,7 +199,7 @@ async function initDb() {
     uptime_seconds INTEGER DEFAULT 0,
     ip_address VARCHAR(50),
     firmware_version VARCHAR(50) DEFAULT 'v1.0.0',
-    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    last_seen TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
@@ -233,7 +233,7 @@ CREATE TABLE IF NOT EXISTS alerts (
   severity VARCHAR(20) NOT NULL,
   sensor VARCHAR(100),
   acknowledged BOOLEAN DEFAULT false,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 `);
 
@@ -253,7 +253,7 @@ CREATE TABLE IF NOT EXISTS alerts (
     type VARCHAR(30) NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
@@ -273,7 +273,7 @@ CREATE TABLE IF NOT EXISTS alerts (
     name VARCHAR(100) NOT NULL,
     species VARCHAR(150) DEFAULT 'Ismeretlen fajta',
     emoji VARCHAR(10) DEFAULT '🌱',
-    planted_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    planted_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 
     temp_min NUMERIC(5,2) DEFAULT 18,
     temp_max NUMERIC(5,2) DEFAULT 28,
@@ -287,8 +287,8 @@ CREATE TABLE IF NOT EXISTS alerts (
     light_min NUMERIC(8,2) DEFAULT 800,
     light_max NUMERIC(8,2) DEFAULT 3000,
 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
   );
 `);
 
@@ -309,7 +309,7 @@ CREATE TABLE IF NOT EXISTS alerts (
 
   await pool.query(`
   ALTER TABLE plants
-  ADD COLUMN IF NOT EXISTS planted_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+  ADD COLUMN IF NOT EXISTS planted_date TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
 `);
 
   await pool.query(`
@@ -323,7 +323,7 @@ CREATE TABLE IF NOT EXISTS alerts (
       ) THEN
         ALTER TABLE sensor_data
         ALTER COLUMN created_at TYPE TIMESTAMPTZ
-        USING created_at AT TIME ZONE 'UTC';
+        USING created_at AT TIME ZONE 'Europe/Bucharest';
       END IF;
 
       IF EXISTS (
@@ -334,7 +334,7 @@ CREATE TABLE IF NOT EXISTS alerts (
       ) THEN
         ALTER TABLE device_state
         ALTER COLUMN updated_at TYPE TIMESTAMPTZ
-        USING updated_at AT TIME ZONE 'UTC';
+        USING updated_at AT TIME ZONE 'Europe/Bucharest';
       END IF;
 
       IF EXISTS (
@@ -345,7 +345,7 @@ CREATE TABLE IF NOT EXISTS alerts (
       ) THEN
         ALTER TABLE greenhouse_devices
         ALTER COLUMN created_at TYPE TIMESTAMPTZ
-        USING created_at AT TIME ZONE 'UTC';
+        USING created_at AT TIME ZONE 'Europe/Bucharest';
       END IF;
 
       IF EXISTS (
@@ -356,7 +356,7 @@ CREATE TABLE IF NOT EXISTS alerts (
       ) THEN
         ALTER TABLE greenhouse_devices
         ALTER COLUMN claimed_at TYPE TIMESTAMPTZ
-        USING claimed_at AT TIME ZONE 'UTC';
+        USING claimed_at AT TIME ZONE 'Europe/Bucharest';
       END IF;
 
       IF EXISTS (
@@ -367,7 +367,7 @@ CREATE TABLE IF NOT EXISTS alerts (
       ) THEN
         ALTER TABLE system_settings
         ALTER COLUMN updated_at TYPE TIMESTAMPTZ
-        USING updated_at AT TIME ZONE 'UTC';
+        USING updated_at AT TIME ZONE 'Europe/Bucharest';
       END IF;
 
       IF EXISTS (
@@ -378,7 +378,7 @@ CREATE TABLE IF NOT EXISTS alerts (
       ) THEN
         ALTER TABLE esp32_status
         ALTER COLUMN last_seen TYPE TIMESTAMPTZ
-        USING last_seen AT TIME ZONE 'UTC';
+        USING last_seen AT TIME ZONE 'Europe/Bucharest';
       END IF;
 
       IF EXISTS (
@@ -389,7 +389,7 @@ CREATE TABLE IF NOT EXISTS alerts (
       ) THEN
         ALTER TABLE alerts
         ALTER COLUMN created_at TYPE TIMESTAMPTZ
-        USING created_at AT TIME ZONE 'UTC';
+        USING created_at AT TIME ZONE 'Europe/Bucharest';
       END IF;
 
       IF EXISTS (
@@ -400,7 +400,7 @@ CREATE TABLE IF NOT EXISTS alerts (
       ) THEN
         ALTER TABLE system_logs
         ALTER COLUMN created_at TYPE TIMESTAMPTZ
-        USING created_at AT TIME ZONE 'UTC';
+        USING created_at AT TIME ZONE 'Europe/Bucharest';
       END IF;
 
       IF EXISTS (
@@ -411,7 +411,7 @@ CREATE TABLE IF NOT EXISTS alerts (
       ) THEN
         ALTER TABLE plants
         ALTER COLUMN planted_date TYPE TIMESTAMPTZ
-        USING planted_date AT TIME ZONE 'UTC';
+        USING planted_date AT TIME ZONE 'Europe/Bucharest';
       END IF;
 
       IF EXISTS (
@@ -422,7 +422,7 @@ CREATE TABLE IF NOT EXISTS alerts (
       ) THEN
         ALTER TABLE plants
         ALTER COLUMN created_at TYPE TIMESTAMPTZ
-        USING created_at AT TIME ZONE 'UTC';
+        USING created_at AT TIME ZONE 'Europe/Bucharest';
       END IF;
 
       IF EXISTS (
@@ -433,7 +433,7 @@ CREATE TABLE IF NOT EXISTS alerts (
       ) THEN
         ALTER TABLE plants
         ALTER COLUMN updated_at TYPE TIMESTAMPTZ
-        USING updated_at AT TIME ZONE 'UTC';
+        USING updated_at AT TIME ZONE 'Europe/Bucharest';
       END IF;
 
       IF EXISTS (
@@ -444,7 +444,7 @@ CREATE TABLE IF NOT EXISTS alerts (
       ) THEN
         ALTER TABLE users
         ALTER COLUMN created_at TYPE TIMESTAMPTZ
-        USING created_at AT TIME ZONE 'UTC';
+        USING created_at AT TIME ZONE 'Europe/Bucharest';
       END IF;
     END $$;
   `);
