@@ -478,8 +478,8 @@ class _PlantsScreenState extends State<PlantsScreen> {
                     humidityMax: parseValue(humidityMaxCtrl, 80),
                     soilMin: parseValue(soilMinCtrl, 40),
                     soilMax: parseValue(soilMaxCtrl, 80),
-                    lightMin: parseValue(lightMinCtrl, 5000),
-                    lightMax: parseValue(lightMaxCtrl, 30000),
+                    lightMin: parseValue(lightMinCtrl, 30),
+                    lightMax: parseValue(lightMaxCtrl, 80),
                   );
                 } else {
                   await ApiService.addPlant(
@@ -494,8 +494,8 @@ class _PlantsScreenState extends State<PlantsScreen> {
                     humidityMax: parseValue(humidityMaxCtrl, 80),
                     soilMin: parseValue(soilMinCtrl, 40),
                     soilMax: parseValue(soilMaxCtrl, 80),
-                    lightMin: parseValue(lightMinCtrl, 5000),
-                    lightMax: parseValue(lightMaxCtrl, 30000),
+                    lightMin: parseValue(lightMinCtrl, 30),
+                    lightMax: parseValue(lightMaxCtrl, 80),
                   );
                 }
 

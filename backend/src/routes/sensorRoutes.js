@@ -249,6 +249,43 @@ router.get('/', authMiddleware, async (req, res) => {
   res.json(mapSensorRow(result.rows[0]));
 });
 
+function scheduleAllowsNowSql() {
+  return `
+    (
+      schedule_enabled = false
+      OR (
+        schedule_on < schedule_off
+        AND CURRENT_TIME >= schedule_on
+        AND CURRENT_TIME < schedule_off
+      )
+      OR (
+        schedule_on > schedule_off
+        AND (
+          CURRENT_TIME >= schedule_on
+          OR CURRENT_TIME < schedule_off
+        )
+      )
+    )
+  `;
+}
+
+async function turnOffAutoDevicesOutsideSchedule(userId, greenhouseDeviceId) {
+  await pool.query(
+    `
+    UPDATE device_state
+    SET is_on = false,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = $1
+    AND greenhouse_device_id = $2
+    AND is_auto = true
+    AND schedule_enabled = true
+    AND is_on = true
+    AND NOT ${scheduleAllowsNowSql()}
+    `,
+    [userId, greenhouseDeviceId]
+  );
+}
+
 router.post('/', deviceMiddleware, async (req, res) => {
   const userId = req.device.user_id;
   const greenhouseDeviceId = req.device.id;
@@ -376,6 +413,8 @@ router.post('/', deviceMiddleware, async (req, res) => {
 
   const settings = await getOrCreateSettings(userId);
 
+  await turnOffAutoDevicesOutsideSchedule(userId, greenhouseDeviceId);
+
   async function createAlertIfNeeded(title, message, severity, sensor) {
     const existing = await pool.query(
       `
@@ -436,16 +475,18 @@ router.post('/', deviceMiddleware, async (req, res) => {
   }
 
   async function updateDeviceStateIfAuto(deviceName, isOn) {
-    await pool.query(
+    const result = await pool.query(
       `
-      UPDATE device_state
-      SET is_on = $1,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE user_id = $2
-      AND greenhouse_device_id = $3
-      AND device_name = $4
-      AND is_auto = true
-      `,
+    UPDATE device_state
+    SET is_on = $1,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = $2
+    AND greenhouse_device_id = $3
+    AND device_name = $4
+    AND is_auto = true
+    ${isOn ? `AND ${scheduleAllowsNowSql()}` : ''}
+    RETURNING *
+    `,
       [
         isOn,
         userId,
@@ -453,6 +494,8 @@ router.post('/', deviceMiddleware, async (req, res) => {
         deviceName,
       ]
     );
+
+    return result.rows.length > 0;
   }
 
   if (temperature > Number(settings.temp_max)) {
@@ -520,80 +563,110 @@ router.post('/', deviceMiddleware, async (req, res) => {
 
   // Öntözés automatika
   if (soilMoisture < Number(settings.soil_min) && waterDetected) {
-    await updateDeviceStateIfAuto('pump', true);
+    const changed = await updateDeviceStateIfAuto('pump', true);
 
-    await createAlertIfNeeded(
-      'Automatikus öntözés bekapcsolva',
-      `A talajnedvesség ${soilMoisture}%, ezért a rendszer bekapcsolta az öntözést.`,
-      'warning',
-      'Öntözőrendszer'
-    );
+    if (changed) {
+      await createAlertIfNeeded(
+        'Automatikus öntözés bekapcsolva',
+        `A talajnedvesség ${soilMoisture}%, ezért a rendszer bekapcsolta az öntözést.`,
+        'warning',
+        'Öntözőrendszer'
+      );
+    }
   }
 
   if (soilMoisture >= Number(settings.soil_max)) {
-    await updateDeviceStateIfAuto('pump', false);
+    const changed = await updateDeviceStateIfAuto('pump', false);
 
-    await createAlertIfNeeded(
-      'Automatikus öntözés kikapcsolva',
-      `A talajnedvesség ${soilMoisture}%, ezért a rendszer kikapcsolta az öntözést.`,
-      'ok',
-      'Öntözőrendszer'
-    );
+    if (changed) {
+      await createAlertIfNeeded(
+        'Automatikus öntözés kikapcsolva',
+        `A talajnedvesség ${soilMoisture}%, ezért a rendszer kikapcsolta az öntözést.`,
+        'ok',
+        'Öntözőrendszer'
+      );
+    }
   }
 
   // Szellőzés automatika
   if (temperature > Number(settings.temp_max)) {
-    await updateDeviceStateIfAuto('fan', true);
+    const changed = await updateDeviceStateIfAuto('fan', true);
 
-    await createAlertIfNeeded(
-      'Automatikus szellőzés bekapcsolva',
-      `A hőmérséklet ${temperature}°C, ezért a rendszer bekapcsolta a szellőzést.`,
-      'warning',
-      'Szellőzés'
-    );
+    if (changed) {
+      await createAlertIfNeeded(
+        'Automatikus szellőzés bekapcsolva',
+        `A hőmérséklet ${temperature}°C, ezért a rendszer bekapcsolta a szellőzést.`,
+        'warning',
+        'Szellőzés'
+      );
+    }
   }
 
   if (temperature <= Number(settings.temp_max) - 1) {
-    await updateDeviceStateIfAuto('fan', false);
+    const changed = await updateDeviceStateIfAuto('fan', false);
+
+    if (changed) {
+      await createAlertIfNeeded(
+        'Automatikus szellőzés kikapcsolva',
+        `A hőmérséklet ${temperature}°C, ezért a rendszer kikapcsolta a szellőzést.`,
+        'ok',
+        'Szellőzés'
+      );
+    }
   }
 
   // Fűtés automatika
   if (temperature < Number(settings.temp_min)) {
-    await updateDeviceStateIfAuto('heater', true);
+    const changed = await updateDeviceStateIfAuto('heater', true);
 
-    await createAlertIfNeeded(
-      'Automatikus fűtés bekapcsolva',
-      `A hőmérséklet ${temperature}°C, ezért a rendszer bekapcsolta a fűtést.`,
-      'warning',
-      'Fűtés'
-    );
+    if (changed) {
+      await createAlertIfNeeded(
+        'Automatikus fűtés bekapcsolva',
+        `A hőmérséklet ${temperature}°C, ezért a rendszer bekapcsolta a fűtést.`,
+        'warning',
+        'Fűtés'
+      );
+    }
   }
 
   if (temperature >= Number(settings.temp_min) + 1) {
-    await updateDeviceStateIfAuto('heater', false);
+    const changed = await updateDeviceStateIfAuto('heater', false);
+
+    if (changed) {
+      await createAlertIfNeeded(
+        'Automatikus fűtés kikapcsolva',
+        `A hőmérséklet ${temperature}°C, ezért a rendszer kikapcsolta a fűtést.`,
+        'ok',
+        'Fűtés'
+      );
+    }
   }
 
   // Lámpa automatika
   if (Number(lightIntensity) < Number(settings.light_min)) {
-    await updateDeviceStateIfAuto('light', true);
+    const changed = await updateDeviceStateIfAuto('light', true);
 
-    await createAlertIfNeeded(
-      'Automatikus világítás bekapcsolva',
-      `A fényerő ${lightIntensity}%, ezért a rendszer bekapcsolta a növénylámpát.`,
-      'warning',
-      'Fényerő'
-    );
+    if (changed) {
+      await createAlertIfNeeded(
+        'Automatikus világítás bekapcsolva',
+        `A fényerő ${lightIntensity}%, ezért a rendszer bekapcsolta a növénylámpát.`,
+        'warning',
+        'Fényerő'
+      );
+    }
   }
 
   if (Number(lightIntensity) >= Number(settings.light_max)) {
-    await updateDeviceStateIfAuto('light', false);
+    const changed = await updateDeviceStateIfAuto('light', false);
 
-    await createAlertIfNeeded(
-      'Automatikus világítás kikapcsolva',
-      `A fényerő ${lightIntensity}%, ezért a rendszer kikapcsolta a növénylámpát.`,
-      'ok',
-      'Fényerő'
-    );
+    if (changed) {
+      await createAlertIfNeeded(
+        'Automatikus világítás kikapcsolva',
+        `A fényerő ${lightIntensity}%, ezért a rendszer kikapcsolta a növénylámpát.`,
+        'ok',
+        'Fényerő'
+      );
+    }
   }
 
   res.status(201).json({

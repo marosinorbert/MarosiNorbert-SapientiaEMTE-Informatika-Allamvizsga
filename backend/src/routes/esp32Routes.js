@@ -27,6 +27,43 @@ async function getUserDevice(req, res) {
   return result.rows[0];
 }
 
+function scheduleAllowsNowSql() {
+  return `
+    (
+      schedule_enabled = false
+      OR (
+        schedule_on < schedule_off
+        AND CURRENT_TIME >= schedule_on
+        AND CURRENT_TIME < schedule_off
+      )
+      OR (
+        schedule_on > schedule_off
+        AND (
+          CURRENT_TIME >= schedule_on
+          OR CURRENT_TIME < schedule_off
+        )
+      )
+    )
+  `;
+}
+
+async function turnOffAutoDevicesOutsideSchedule(userId, greenhouseDeviceId) {
+  await pool.query(
+    `
+    UPDATE device_state
+    SET is_on = false,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = $1
+    AND greenhouse_device_id = $2
+    AND is_auto = true
+    AND schedule_enabled = true
+    AND is_on = true
+    AND NOT ${scheduleAllowsNowSql()}
+    `,
+    [userId, greenhouseDeviceId]
+  );
+}
+
 router.get('/status', authMiddleware, async (req, res) => {
   const device = await getUserDevice(req, res);
   if (!device) return;
@@ -147,6 +184,11 @@ router.post('/heartbeat', deviceMiddleware, async (req, res) => {
 });
 
 router.get('/commands', deviceMiddleware, async (req, res) => {
+  await turnOffAutoDevicesOutsideSchedule(
+    req.device.user_id,
+    req.device.id
+  );
+
   const result = await pool.query(
     `
     SELECT device_name, is_on

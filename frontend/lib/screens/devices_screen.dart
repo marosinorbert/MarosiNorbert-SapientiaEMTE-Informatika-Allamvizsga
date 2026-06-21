@@ -24,7 +24,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
       uptimeHours: 14,
       scheduleOn: const TimeOfDay(hour: 7, minute: 0),
       scheduleOff: const TimeOfDay(hour: 21, minute: 0),
-      autoCondition: 'Ha hőmérséklet > 26°C',
+      autoCondition: 'Bekapcsol: hőmérséklet > 28°C, kikapcsol: ≤ 27°C',
     ),
     _Device(
       name: 'Öntözőrendszer',
@@ -37,7 +37,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
       uptimeHours: 3,
       scheduleOn: const TimeOfDay(hour: 8, minute: 0),
       scheduleOff: const TimeOfDay(hour: 8, minute: 30),
-      autoCondition: 'Ha talajnedvesség < 40%',
+      autoCondition: 'Bekapcsol: talajnedvesség < 35%, kikapcsol: ≥ 80%',
     ),
     _Device(
       name: 'Növénylámpa',
@@ -50,7 +50,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
       uptimeHours: 8,
       scheduleOn: const TimeOfDay(hour: 6, minute: 0),
       scheduleOff: const TimeOfDay(hour: 20, minute: 0),
-      autoCondition: 'Ha fényerő < 5000 lux',
+      autoCondition: 'Bekapcsol: fényerő < 30%, kikapcsol: ≥ 80%',
     ),
     _Device(
       name: 'Fűtés',
@@ -63,7 +63,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
       uptimeHours: 0,
       scheduleOn: const TimeOfDay(hour: 5, minute: 0),
       scheduleOff: const TimeOfDay(hour: 9, minute: 0),
-      autoCondition: 'Ha hőmérséklet < 18°C',
+      autoCondition: 'Bekapcsol: hőmérséklet < 18°C, kikapcsol: ≥ 19°C',
     ),
   ];
 
@@ -246,7 +246,8 @@ class _DevicesScreenState extends State<DevicesScreen> {
     final tempMax = _settingNumber(settings, 'temp_max', 'tempMax', 28);
     final soilMin = _settingNumber(settings, 'soil_min', 'soilMin', 35);
     final soilMax = _settingNumber(settings, 'soil_max', 'soilMax', 80);
-    final lightMin = _settingNumber(settings, 'light_min', 'lightMin', 800);
+    final lightMin = _settingNumber(settings, 'light_min', 'lightMin', 30);
+    final lightMax = _settingNumber(settings, 'light_max', 'lightMax', 80);
 
     switch (device.deviceKey) {
       case 'pump':
@@ -262,7 +263,8 @@ class _DevicesScreenState extends State<DevicesScreen> {
             'kikapcsol: ≥ ${_formatNumber(tempMin + 1)}°C';
 
       case 'light':
-        return 'Beállított fényhatár: < ${_formatNumber(lightMin)} lux';
+        return 'Bekapcsol: fényerő < ${_formatNumber(lightMin)}%, '
+            'kikapcsol: ≥ ${_formatNumber(lightMax)}%';
 
       default:
         return 'Automata feltétel nem elérhető';
