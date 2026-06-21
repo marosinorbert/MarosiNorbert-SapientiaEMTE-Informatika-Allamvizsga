@@ -27,6 +27,22 @@ class _SensorsScreenState extends State<SensorsScreen> {
     _loadSensorData(showLoading: true);
   }
 
+  double _hourFromDbTime(dynamic value, int fallbackIndex) {
+    final text = value?.toString();
+
+    if (text == null || text.isEmpty) {
+      return fallbackIndex.toDouble();
+    }
+
+    final dt = DateTime.tryParse(text.replaceFirst(' ', 'T'));
+
+    if (dt == null) {
+      return fallbackIndex.toDouble();
+    }
+
+    return dt.hour + (dt.minute / 60.0);
+  }
+
   Future<void> _loadSensorData({bool showLoading = false}) async {
     try {
       if (showLoading && mounted) {
@@ -83,16 +99,21 @@ class _SensorsScreenState extends State<SensorsScreen> {
       for (int i = 0; i < historyJson.length; i++) {
         final item = historyJson[i];
 
+        final hour = _hourFromDbTime(
+          item['createdAtFormatted'] ?? item['createdAt'] ?? item['created_at'],
+          i,
+        );
+
         tempSpots.add(
           FlSpot(
-            i.toDouble(),
+            hour,
             (item['temperature'] ?? 0).toDouble(),
           ),
         );
 
         soilSpots.add(
           FlSpot(
-            i.toDouble(),
+            hour,
             (item['soilMoisture'] ?? 0).toDouble(),
           ),
         );

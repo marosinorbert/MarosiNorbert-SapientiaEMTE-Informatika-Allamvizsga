@@ -139,12 +139,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 
   double _xFromCreatedAt(dynamic value, DateTime start) {
-    final parsed = DateTime.tryParse(value?.toString() ?? '');
+    final text = value?.toString();
+
+    if (text == null || text.isEmpty) return 0;
+
+    final parsed = DateTime.tryParse(text.replaceFirst(' ', 'T'));
 
     if (parsed == null) return 0;
 
-    final local = parsed.toLocal();
-    final diffMinutes = local.difference(start).inMinutes;
+    final diffMinutes = parsed.difference(start).inMinutes;
 
     return diffMinutes / 1440;
   }
@@ -159,9 +162,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     for (final rawItem in history) {
       final item = rawItem as Map<String, dynamic>;
 
+      final createdAt =
+          item['createdAtFormatted'] ?? item['createdAt'] ?? item['created_at'];
+
       final x = _timeRange == TimeRange.daily
-          ? localHourFromCreatedAt(item['createdAt'] ?? item['created_at'])
-          : _xFromCreatedAt(item['createdAt'] ?? item['created_at'], start);
+          ? localHourFromCreatedAt(createdAt)
+          : _xFromCreatedAt(createdAt, start);
 
       final y = valueGetter(item);
 
@@ -174,19 +180,45 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 
   double localHourFromCreatedAt(dynamic value) {
-    final parsed = DateTime.tryParse(value?.toString() ?? '');
+    final text = value?.toString();
+
+    if (text == null || text.isEmpty) return 0;
+
+    final parsed = DateTime.tryParse(text.replaceFirst(' ', 'T'));
 
     if (parsed == null) return 0;
 
-    final local = parsed.toLocal();
-
-    return local.hour + (local.minute / 60.0);
+    return parsed.hour + (parsed.minute / 60.0);
   }
 
   @override
   void initState() {
     super.initState();
     _loadStatistics(showLoading: true);
+  }
+
+  DateTime? _parseDbDate(dynamic value) {
+    final text = value?.toString();
+
+    if (text == null || text.isEmpty) {
+      return null;
+    }
+
+    return DateTime.tryParse(text.replaceFirst(' ', 'T'));
+  }
+
+  double _xFromDbTime(dynamic value, DateTime start, int fallbackIndex) {
+    final dt = _parseDbDate(value);
+
+    if (dt == null) {
+      return fallbackIndex.toDouble();
+    }
+
+    if (_timeRange == TimeRange.daily) {
+      return dt.hour + (dt.minute / 60.0);
+    }
+
+    return dt.difference(start).inMinutes / 1440.0;
   }
 
   Future<void> _loadStatistics({bool showLoading = false}) async {

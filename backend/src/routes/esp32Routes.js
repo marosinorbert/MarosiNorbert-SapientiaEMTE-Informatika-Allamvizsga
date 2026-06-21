@@ -38,7 +38,8 @@ router.get('/status', authMiddleware, async (req, res) => {
         WHEN last_seen >= NOW() - INTERVAL '30 seconds'
         THEN true
         ELSE false
-      END AS is_online_calculated
+      END AS is_online_calculated,
+      to_char(last_seen AT TIME ZONE 'Europe/Bucharest', 'YYYY-MM-DD HH24:MI:SS') AS last_seen_formatted
     FROM esp32_status
     WHERE user_id = $1
     AND greenhouse_device_id = $2
@@ -76,7 +77,7 @@ router.get('/status', authMiddleware, async (req, res) => {
     uptimeSeconds: row.uptime_seconds,
     ipAddress: row.ip_address,
     firmwareVersion: row.firmware_version,
-    lastSeen: row.last_seen,
+    lastSeen: row.last_seen_formatted,
   });
 });
 

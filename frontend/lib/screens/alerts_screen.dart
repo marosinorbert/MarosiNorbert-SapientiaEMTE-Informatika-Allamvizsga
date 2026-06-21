@@ -59,6 +59,28 @@ class _AlertsScreenState extends State<AlertsScreen> {
     _loadAlerts(showLoading: true);
   }
 
+  String _formatDbDateTime(dynamic value) {
+    final text = value?.toString();
+
+    if (text == null || text.isEmpty) {
+      return '-';
+    }
+
+    final dt = DateTime.tryParse(text.replaceFirst(' ', 'T'));
+
+    if (dt == null) {
+      return text;
+    }
+
+    final year = dt.year.toString();
+    final month = dt.month.toString().padLeft(2, '0');
+    final day = dt.day.toString().padLeft(2, '0');
+    final hour = dt.hour.toString().padLeft(2, '0');
+    final minute = dt.minute.toString().padLeft(2, '0');
+
+    return '$year.$month.$day $hour:$minute';
+  }
+
   Future<void> _loadAlerts({bool showLoading = false}) async {
     try {
       if (showLoading && mounted) {
@@ -97,7 +119,9 @@ class _AlertsScreenState extends State<AlertsScreen> {
             message: a['message'],
             severity: _parseSeverity(a['severity']),
             sensor: a['sensor'] ?? '',
-            time: a['created_at'].toString(),
+            time: _formatDbDateTime(
+              a['created_at_formatted'] ?? a['created_at'],
+            ),
             acknowledged: a['acknowledged'] ?? false,
           );
         }).toList();

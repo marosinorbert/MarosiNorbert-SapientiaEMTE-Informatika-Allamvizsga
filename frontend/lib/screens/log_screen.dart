@@ -154,6 +154,16 @@ class _LogScreenState extends State<LogScreen> {
     super.dispose();
   }
 
+  DateTime _parseDbDate(dynamic value) {
+    final text = value?.toString();
+
+    if (text == null || text.isEmpty) {
+      return DateTime.now();
+    }
+
+    return DateTime.tryParse(text.replaceFirst(' ', 'T')) ?? DateTime.now();
+  }
+
   Future<void> _loadLogs({bool showLoading = false}) async {
     try {
       if (showLoading && mounted) {
@@ -191,7 +201,9 @@ class _LogScreenState extends State<LogScreen> {
             type: _parseLogType(log['type']),
             title: log['title'],
             description: log['description'] ?? '',
-            timestamp: DateTime.parse(log['created_at']),
+            timestamp: _parseDbDate(
+              log['created_at_formatted'] ?? log['created_at'],
+            ),
           );
         }).toList();
 

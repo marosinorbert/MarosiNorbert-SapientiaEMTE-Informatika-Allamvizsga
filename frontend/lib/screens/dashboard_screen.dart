@@ -123,15 +123,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return fallback;
   }
 
-  double _hourFromCreatedAt(dynamic value) {
+  double _hourFromFormattedCreatedAt(dynamic value) {
     if (value == null) return 0;
 
-    final dateTime = DateTime.tryParse(value.toString());
-    if (dateTime == null) return 0;
+    final text = value.toString();
+    final parsed = DateTime.tryParse(text.replaceFirst(' ', 'T'));
 
-    final localTime = dateTime.toLocal();
+    if (parsed != null) {
+      return parsed.hour + (parsed.minute / 60.0);
+    }
 
-    return localTime.hour + (localTime.minute / 60.0);
+    final match = RegExp(r'(\d{1,2}):(\d{2})').firstMatch(text);
+
+    if (match == null) return 0;
+
+    final hour = int.tryParse(match.group(1) ?? '0') ?? 0;
+    final minute = int.tryParse(match.group(2) ?? '0') ?? 0;
+
+    return hour + (minute / 60.0);
   }
 
   SensorData _data = SensorData.dummy;
@@ -200,7 +209,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final humiditySpots = <FlSpot>[];
 
       for (final item in historyJson) {
-        final hour = _hourFromCreatedAt(item['createdAt']);
+        final hour = _hourFromFormattedCreatedAt(
+          item['createdAtFormatted'] ?? item['createdAt'] ?? item['created_at'],
+        );
 
         tempSpots.add(
           FlSpot(
@@ -270,7 +281,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           humidity: (latestJson['humidity'] ?? 0).toDouble(),
           soilMoisture: (latestJson['soilMoisture'] ?? 0).toDouble(),
           lightIntensity: 0,
-          lastUpdated: latestJson['createdAt'] ?? 'Most',
+          lastUpdated: latestJson['createdAtFormatted'] ??
+              latestJson['createdAt']?.toString() ??
+              'Most',
         );
 
         _tempSpots = tempSpots;

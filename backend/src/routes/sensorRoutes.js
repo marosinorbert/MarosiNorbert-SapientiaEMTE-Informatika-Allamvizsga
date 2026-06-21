@@ -49,6 +49,10 @@ async function getOrCreateSettings(userId) {
   return created.rows[0];
 }
 
+function localTimeSql(column, alias) {
+  return `to_char(${column} AT TIME ZONE 'Europe/Bucharest', 'YYYY-MM-DD HH24:MI:SS') AS ${alias}`;
+}
+
 function mapSensorRow(row) {
   return {
     id: row.id,
@@ -59,6 +63,7 @@ function mapSensorRow(row) {
     lightOn: row.light_on,
     pumpOn: row.pump_on,
     createdAt: row.created_at,
+    createdAtFormatted: row.created_at_formatted,
   };
 }
 
@@ -88,7 +93,8 @@ router.get('/export/csv', authMiddleware, async (req, res) => {
   if (today === 'true') {
     result = await pool.query(
       `
-      SELECT *
+      SELECT *,
+        ${localTimeSql('created_at', 'created_at_formatted')}
       FROM sensor_data
       WHERE user_id = $1
       AND created_at >= CURRENT_DATE
@@ -102,7 +108,8 @@ router.get('/export/csv', authMiddleware, async (req, res) => {
 
     result = await pool.query(
       `
-      SELECT *
+      SELECT *,
+        ${localTimeSql('created_at', 'created_at_formatted')}
       FROM sensor_data
       WHERE user_id = $1
       AND created_at >= NOW() - ($2 * INTERVAL '1 day')
@@ -125,7 +132,7 @@ router.get('/export/csv', authMiddleware, async (req, res) => {
 
   const rows = result.rows.map((row) => [
     row.id,
-    row.created_at,
+    row.created_at_formatted,
     row.temperature,
     row.humidity,
     row.soil_moisture,
@@ -162,7 +169,8 @@ router.get('/history', authMiddleware, async (req, res) => {
   if (today === 'true') {
     result = await pool.query(
       `
-      SELECT *
+      SELECT *,
+        ${localTimeSql('created_at', 'created_at_formatted')}
       FROM sensor_data
       WHERE user_id = $1
       AND created_at >= CURRENT_DATE
@@ -176,7 +184,8 @@ router.get('/history', authMiddleware, async (req, res) => {
 
     result = await pool.query(
       `
-      SELECT *
+      SELECT *,
+        ${localTimeSql('created_at', 'created_at_formatted')}
       FROM sensor_data
       WHERE user_id = $1
       AND created_at >= NOW() - ($2 * INTERVAL '1 day')
@@ -189,7 +198,8 @@ router.get('/history', authMiddleware, async (req, res) => {
 
     result = await pool.query(
       `
-      SELECT *
+      SELECT *,
+        ${localTimeSql('created_at', 'created_at_formatted')}
       FROM sensor_data
       WHERE user_id = $1
       AND created_at >= NOW() - ($2 * INTERVAL '1 hour')
@@ -205,7 +215,8 @@ router.get('/history', authMiddleware, async (req, res) => {
 router.get('/', authMiddleware, async (req, res) => {
   const result = await pool.query(
     `
-    SELECT *
+    SELECT *,
+      ${localTimeSql('created_at', 'created_at_formatted')}
     FROM sensor_data
     WHERE user_id = $1
     ORDER BY created_at DESC
@@ -216,6 +227,8 @@ router.get('/', authMiddleware, async (req, res) => {
 
   if (result.rows.length === 0) {
     return res.json({
+      createdAt: null,
+      createdAtFormatted: null,
       temperature: 0,
       humidity: 0,
       soilMoisture: 0,
