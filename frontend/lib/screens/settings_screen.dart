@@ -67,12 +67,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _mqttBroker = 'mqtt.example.com';
   int _mqttPort = 1883;
 
-  // Security
-  String _currentPassword = '';
-  String _newPassword = '';
-  String _confirmPassword = '';
-  String _pinCode = '0000';
-
   // System info
   final String _firmwareVersion = 'v1.3.2';
   final String _hardwareMAC = '3C:71:BF:A1:B2:C3';
@@ -394,12 +388,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),
-              onPressed: () {
-                if (newCtrl.text == confirmCtrl.text &&
-                    newCtrl.text.isNotEmpty) {
-                  setState(() => _newPassword = newCtrl.text);
+              onPressed: () async {
+                final currentPassword = currentCtrl.text.trim();
+                final newPassword = newCtrl.text.trim();
+                final confirmPassword = confirmCtrl.text.trim();
+
+                if (currentPassword.isEmpty ||
+                    newPassword.isEmpty ||
+                    confirmPassword.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Minden jelszó mező kitöltése kötelező.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                if (newPassword != confirmPassword) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Az új jelszavak nem egyeznek.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                try {
+                  await ApiService.changePassword(
+                    currentPassword: currentPassword,
+                    newPassword: newPassword,
+                  );
+
+                  if (!mounted) return;
+
                   Navigator.pop(ctx);
-                  _saveSettings();
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Jelszó sikeresen módosítva.'),
+                      backgroundColor: AppTheme.primary,
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Hiba: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
                 }
               },
               child: const Text('Mentés'),
@@ -410,42 +450,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _changePIN() {
-    final pinCtrl = TextEditingController(text: _pinCode);
-    showDialog(
+  Future<void> _deleteProfile() async {
+    final confirmCtrl = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          'PIN kód módosítása',
+          'Profil törlése',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         content: SizedBox(
-          width: 300,
+          width: 360,
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('4 számjegyű PIN kód',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textSecondary)),
+              const Text(
+                'Ez véglegesen törli a felhasználói profilodat, minden szenzoradatot, naplót, riasztást, növényt és beállítást. Az ESP32 eszköz leválasztásra kerül, és újra claimelhető lesz.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'A megerősítéshez írd be: TORLES',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
               const SizedBox(height: 8),
               TextField(
-                controller: pinCtrl,
-                keyboardType: TextInputType.number,
-                maxLength: 4,
-                obscureText: true,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 24, letterSpacing: 8),
+                controller: confirmCtrl,
                 decoration: InputDecoration(
+                  hintText: 'TORLES',
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide:
-                        const BorderSide(color: AppTheme.primary, width: 2),
                   ),
                 ),
               ),
@@ -454,29 +498,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Mégse',
-                style: TextStyle(color: AppTheme.textSecondary)),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              'Mégse',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
+              backgroundColor: const Color(0xFFEF4444),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () {
-              if (pinCtrl.text.length == 4) {
-                setState(() => _pinCode = pinCtrl.text);
-                Navigator.pop(ctx);
-                _saveSettings();
+              if (confirmCtrl.text.trim().toUpperCase() == 'TORLES') {
+                Navigator.pop(ctx, true);
               }
             },
-            child: const Text('Mentés'),
+            child: const Text('Profil törlése'),
           ),
         ],
       ),
     );
+
+    if (confirmed != true) return;
+
+    try {
+      await ApiService.deleteProfile();
+
+      if (!mounted) return;
+
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/login',
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Hiba: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -847,9 +915,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const Divider(color: AppTheme.border, height: 1),
               _SettingItem(
-                label: 'PIN kód módosítása',
-                subtitle: '••••',
-                onTap: _changePIN,
+                label: 'Felhasználói profil törlése',
+                subtitle:
+                    'Profil, adatok és ESP32 hozzárendelés végleges törlése',
+                onTap: _deleteProfile,
               ),
             ],
           ),

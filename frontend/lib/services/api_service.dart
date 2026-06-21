@@ -42,6 +42,39 @@ class ApiService {
     };
   }
 
+  static Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/auth/password'),
+      headers: await authHeaders(),
+      body: jsonEncode({
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body);
+      throw Exception(data['message'] ?? 'Nem sikerült módosítani a jelszót.');
+    }
+  }
+
+  static Future<void> deleteProfile() async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/auth/profile'),
+      headers: await authHeaders(),
+    );
+
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body);
+      throw Exception(data['message'] ?? 'Nem sikerült törölni a profilt.');
+    }
+
+    await logout();
+  }
+
   static Future<Map<String, dynamic>> getLatestSensorData() async {
     final response = await http.get(
       Uri.parse('$baseUrl/sensors'),
