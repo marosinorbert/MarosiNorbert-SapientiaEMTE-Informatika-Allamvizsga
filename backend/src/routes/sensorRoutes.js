@@ -3,6 +3,11 @@ const router = express.Router();
 const pool = require('../db');
 const authMiddleware = require('../middleware/authMiddleware');
 const deviceMiddleware = require('../middleware/deviceMiddleware');
+const {
+  isValidNumber,
+  validateBoolean,
+} = require('../utils/validation');
+
 
 async function getOrCreateSettings(userId) {
   const existing = await pool.query(
@@ -143,6 +148,46 @@ router.post('/', deviceMiddleware, async (req, res) => {
     lightOn = false,
     pumpOn = false,
   } = req.body;
+
+  const validationErrors = [];
+
+  if (!isValidNumber(temperature)) {
+    validationErrors.push('A hőmérséklet értéke kötelező és szám kell legyen.');
+  }
+
+  if (!isValidNumber(humidity)) {
+    validationErrors.push('A páratartalom értéke kötelező és szám kell legyen.');
+  }
+
+  if (!isValidNumber(soilMoisture)) {
+    validationErrors.push('A talajnedvesség értéke kötelező és szám kell legyen.');
+  }
+
+  if (isValidNumber(humidity) && (Number(humidity) < 0 || Number(humidity) > 100)) {
+    validationErrors.push('A páratartalom 0 és 100 között lehet.');
+  }
+
+  if (
+    isValidNumber(soilMoisture) &&
+    (Number(soilMoisture) < 0 || Number(soilMoisture) > 100)
+  ) {
+    validationErrors.push('A talajnedvesség 0 és 100 között lehet.');
+  }
+
+  const waterDetectedError = validateBoolean(waterDetected, 'Víztartály állapot');
+  const lightOnError = validateBoolean(lightOn, 'Lámpa állapot');
+  const pumpOnError = validateBoolean(pumpOn, 'Pumpa állapot');
+
+  if (waterDetectedError) validationErrors.push(waterDetectedError);
+  if (lightOnError) validationErrors.push(lightOnError);
+  if (pumpOnError) validationErrors.push(pumpOnError);
+
+  if (validationErrors.length > 0) {
+    return res.status(400).json({
+      message: validationErrors[0],
+      errors: validationErrors,
+    });
+  }
 
   const result = await pool.query(
     `
