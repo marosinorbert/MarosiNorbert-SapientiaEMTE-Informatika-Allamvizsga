@@ -67,11 +67,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _mqttBroker = 'mqtt.example.com';
   int _mqttPort = 1883;
 
-  // System info
-  final String _firmwareVersion = 'v1.3.2';
-  final String _hardwareMAC = '3C:71:BF:A1:B2:C3';
-  final String _ipAddress = '192.168.1.100';
-  final int _uptimeHours = 247;
+// System info
+  bool _esp32Online = false;
+  String _firmwareVersion = '-';
+  String _ipAddress = '-';
+  String _lastSeen = '-';
+  int _uptimeSeconds = 0;
+  int _signalStrength = 0;
+  int _freeRam = 0;
+  int _totalRam = 0;
 
   double _toDouble(dynamic value, double fallback) {
     if (value == null) return fallback;
@@ -80,10 +84,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return fallback;
   }
 
+  int _toInt(dynamic value, int fallback) {
+    if (value == null) return fallback;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? fallback;
+    return fallback;
+  }
+
+  String _formatUptime(int seconds) {
+    if (seconds <= 0) return '-';
+
+    final days = seconds ~/ 86400;
+    final hours = (seconds % 86400) ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+
+    if (days > 0) {
+      return '$days nap $hours óra';
+    }
+
+    if (hours > 0) {
+      return '$hours óra $minutes perc';
+    }
+
+    return '$minutes perc';
+  }
+
   Future<void> _loadSettings() async {
     try {
       final settings = await ApiService.getSettings();
 
+      Map<String, dynamic>? esp32Status;
+
+      try {
+        esp32Status = await ApiService.getEsp32Status();
+      } catch (_) {
+        esp32Status = null;
+      }
       setState(() {
         _tempMin = _toDouble(settings['temp_min'], 18);
         _tempMax = _toDouble(settings['temp_max'], 28);
@@ -100,6 +137,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _darkMode = settings['dark_mode'] ?? false;
         _language = settings['language'] ?? 'hu';
         _tempUnit = settings['temp_unit'] ?? '°C';
+
+        if (esp32Status != null) {
+          _esp32Online = esp32Status['isOnline'] ?? false;
+          _firmwareVersion = esp32Status['firmwareVersion']?.toString() ?? '-';
+          _ipAddress = esp32Status['ipAddress']?.toString() ?? '-';
+          _lastSeen = esp32Status['lastSeen']?.toString() ?? '-';
+          _uptimeSeconds = _toInt(esp32Status['uptimeSeconds'], 0);
+          _signalStrength = _toInt(esp32Status['signalStrength'], 0);
+          _freeRam = _toInt(esp32Status['freeRam'], 0);
+          _totalRam = _toInt(esp32Status['totalRam'], 0);
+        } else {
+          _esp32Online = false;
+          _firmwareVersion = '-';
+          _ipAddress = '-';
+          _lastSeen = '-';
+          _uptimeSeconds = 0;
+          _signalStrength = 0;
+          _freeRam = 0;
+          _totalRam = 0;
+        }
 
         _isLoading = false;
       });
@@ -925,62 +982,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 16),
 
-          // Data management
-          _SettingsSection(
-            title: 'Adatok kezelése',
-            icon: Icons.storage_rounded,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                '✓ Adatok exportálva: greenhouse_backup.json'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.download_rounded),
-                      label: const Text('Export'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('✓ Adatok importálva sikeresen!'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.upload_rounded),
-                      label: const Text('Import'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
           // System info
           _SettingsSection(
             title: 'Rendszer információ',
             icon: Icons.info_rounded,
             children: [
               _InfoRow(
-                label: 'Firmware verzió',
-                value: _firmwareVersion,
+                label: 'ESP32 állapot',
+                value: _esp32Online ? 'Online' : 'Offline',
               ),
               _InfoRow(
-                label: 'Hardware MAC',
-                value: _hardwareMAC,
+                label: 'Firmware verzió',
+                value: _firmwareVersion,
               ),
               _InfoRow(
                 label: 'IP cím',
@@ -988,7 +1001,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               _InfoRow(
                 label: 'Uptime',
-                value: '$_uptimeHours óra',
+                value: _formatUptime(_uptimeSeconds),
+              ),
+              _InfoRow(
+                label: 'WiFi jelerősség',
+                value: '$_signalStrength dBm',
+              ),
+              _InfoRow(
+                label: 'Szabad memória',
+                value: _totalRam > 0
+                    ? '$_freeRam KB / $_totalRam KB'
+                    : '$_freeRam KB',
+              ),
+              _InfoRow(
+                label: 'Utolsó kapcsolat',
+                value: _lastSeen,
               ),
             ],
           ),
