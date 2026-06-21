@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const authMiddleware = require('../middleware/authMiddleware');
+const {
+  validateRange,
+  validateRequiredString,
+  validatePositiveInteger,
+} = require('../utils/validation');
 
 async function getUserDeviceId(userId) {
   const result = await pool.query(
@@ -21,6 +26,46 @@ async function getUserDeviceId(userId) {
   }
 
   return result.rows[0].id;
+}
+
+function validatePlantInput(body) {
+  const {
+    name,
+    tempMin,
+    tempMax,
+    humidityMin,
+    humidityMax,
+    soilMin,
+    soilMax,
+    lightMin,
+    lightMax,
+  } = body;
+
+  const validationErrors = [
+    validateRequiredString(name, 'Növény neve'),
+    validateRange(tempMin, tempMax, 'Hőmérséklet'),
+    validateRange(humidityMin, humidityMax, 'Páratartalom'),
+    validateRange(soilMin, soilMax, 'Talajnedvesség'),
+    validateRange(lightMin, lightMax, 'Fényerő'),
+  ].filter(Boolean);
+
+  if (validationErrors.length > 0) {
+    return validationErrors;
+  }
+
+  if (Number(humidityMin) < 0 || Number(humidityMax) > 100) {
+    return ['A páratartalom értékei 0 és 100 között lehetnek.'];
+  }
+
+  if (Number(soilMin) < 0 || Number(soilMax) > 100) {
+    return ['A talajnedvesség értékei 0 és 100 között lehetnek.'];
+  }
+
+  if (Number(lightMin) < 0 || Number(lightMax) < 0) {
+    return ['A fényerő értékei nem lehetnek negatívak.'];
+  }
+
+  return [];
 }
 
 router.get('/', authMiddleware, async (req, res) => {
@@ -51,6 +96,15 @@ router.post('/', authMiddleware, async (req, res) => {
     lightMin,
     lightMax,
   } = req.body;
+
+  const validationErrors = validatePlantInput(req.body);
+
+  if (validationErrors.length > 0) {
+    return res.status(400).json({
+      message: validationErrors[0],
+      errors: validationErrors,
+    });
+  }
 
   const result = await pool.query(
     `
@@ -114,6 +168,13 @@ router.post('/', authMiddleware, async (req, res) => {
 
 router.put('/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
+  const idError = validatePositiveInteger(id, 'Növény azonosító');
+
+  if (idError) {
+    return res.status(400).json({
+      message: idError,
+    });
+  }
 
   const {
     name,
@@ -128,6 +189,15 @@ router.put('/:id', authMiddleware, async (req, res) => {
     lightMin,
     lightMax,
   } = req.body;
+
+  const validationErrors = validatePlantInput(req.body);
+
+  if (validationErrors.length > 0) {
+    return res.status(400).json({
+      message: validationErrors[0],
+      errors: validationErrors,
+    });
+  }
 
   const result = await pool.query(
     `
@@ -199,6 +269,13 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
 router.delete('/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
+  const idError = validatePositiveInteger(id, 'Növény azonosító');
+
+  if (idError) {
+    return res.status(400).json({
+      message: idError,
+    });
+  }
 
   const plantResult = await pool.query(
     `

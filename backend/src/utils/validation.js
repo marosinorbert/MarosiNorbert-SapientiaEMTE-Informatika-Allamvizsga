@@ -70,6 +70,16 @@ function validateTimeString(value, label) {
     return null;
 }
 
+function validatePositiveInteger(value, label) {
+    const number = Number(value);
+
+    if (!Number.isInteger(number) || number <= 0) {
+        return `${label}: érvényes pozitív egész szám szükséges.`;
+    }
+
+    return null;
+}
+
 module.exports = {
     isValidNumber,
     toNumber,
@@ -79,4 +89,5 @@ module.exports = {
     validateBoolean,
     validateClaimCode,
     validateTimeString,
+    validatePositiveInteger,
 };
