@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const authMiddleware = require('../middleware/authMiddleware');
+const {
+    validateClaimCode,
+    validatePositiveInteger,
+} = require('../utils/validation');
 
 router.get('/', authMiddleware, async (req, res) => {
     const result = await pool.query(
@@ -20,11 +24,15 @@ router.get('/', authMiddleware, async (req, res) => {
 router.post('/claim', authMiddleware, async (req, res) => {
     const { claimCode } = req.body;
 
-    if (!claimCode) {
+    const claimCodeError = validateClaimCode(claimCode);
+
+    if (claimCodeError) {
         return res.status(400).json({
-            message: 'Claim code megadása kötelező.',
+            message: claimCodeError,
         });
     }
+
+    const normalizedClaimCode = claimCode.toString().trim().toUpperCase();
 
     const result = await pool.query(
         `
@@ -37,7 +45,7 @@ router.post('/claim', authMiddleware, async (req, res) => {
     AND is_claimed = false
     RETURNING id, device_name, claim_code, is_claimed, claimed_at
     `,
-        [req.user.id, claimCode]
+        [req.user.id, normalizedClaimCode]
     );
 
     if (result.rows.length === 0) {
@@ -98,6 +106,13 @@ router.post('/claim', authMiddleware, async (req, res) => {
 
 router.delete('/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
+    const idError = validatePositiveInteger(id, 'ESP32 eszköz azonosító');
+
+    if (idError) {
+        return res.status(400).json({
+            message: idError,
+        });
+    }
 
     const deviceResult = await pool.query(
         `

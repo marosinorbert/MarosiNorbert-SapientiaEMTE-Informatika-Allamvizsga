@@ -50,7 +50,15 @@ function validateBoolean(value, label) {
 
 function validateClaimCode(claimCode) {
     if (!claimCode || claimCode.toString().trim().length < 4) {
-        return 'Érvénytelen claim kód.';
+        return 'Claim kód megadása kötelező.';
+    }
+
+    const normalized = claimCode.toString().trim().toUpperCase();
+
+    const claimCodeRegex = /^[A-Z0-9-]{4,50}$/;
+
+    if (!claimCodeRegex.test(normalized)) {
+        return 'Érvénytelen claim kód formátum. Csak betű, szám és kötőjel használható.';
     }
 
     return null;
