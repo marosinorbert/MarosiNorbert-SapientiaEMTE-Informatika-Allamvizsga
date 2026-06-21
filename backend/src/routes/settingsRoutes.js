@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const authMiddleware = require('../middleware/authMiddleware');
+const { validateRange, } = require('../utils/validation');
 
 async function getUserDeviceId(userId) {
   const result = await pool.query(
@@ -82,6 +83,38 @@ router.post('/', authMiddleware, async (req, res) => {
     language,
     tempUnit,
   } = req.body;
+
+  const validationErrors = [
+    validateRange(tempMin, tempMax, 'Hőmérséklet'),
+    validateRange(humidityMin, humidityMax, 'Páratartalom'),
+    validateRange(soilMin, soilMax, 'Talajnedvesség'),
+    validateRange(lightMin, lightMax, 'Fényerő'),
+  ].filter(Boolean);
+
+  if (validationErrors.length > 0) {
+    return res.status(400).json({
+      message: validationErrors[0],
+      errors: validationErrors,
+    });
+  }
+
+  if (typeof darkMode !== 'boolean') {
+    return res.status(400).json({
+      message: 'A sötét mód értéke hibás.',
+    });
+  }
+
+  if (!['hu', 'en'].includes(language)) {
+    return res.status(400).json({
+      message: 'Érvénytelen nyelv.',
+    });
+  }
+
+  if (!['°C', '°F'].includes(tempUnit)) {
+    return res.status(400).json({
+      message: 'Érvénytelen hőmérséklet mértékegység.',
+    });
+  }
 
   const result = await pool.query(
     `
