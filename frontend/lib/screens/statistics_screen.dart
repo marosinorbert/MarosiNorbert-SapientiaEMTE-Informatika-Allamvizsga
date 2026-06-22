@@ -73,15 +73,30 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   double _xFromCreatedAt(dynamic value, DateTime start) {
     final text = value?.toString();
 
-    if (text == null || text.isEmpty) return 0;
+    if (text == null || text.isEmpty) {
+      return 0;
+    }
 
     final parsed = DateTime.tryParse(text.replaceFirst(' ', 'T'));
 
-    if (parsed == null) return 0;
+    if (parsed == null) {
+      return 0;
+    }
 
-    final diffMinutes = parsed.difference(start).inMinutes;
+    switch (_timeRange) {
+      case TimeRange.daily:
+        return parsed.hour + (parsed.minute / 60.0);
 
-    return diffMinutes / 1440;
+      case TimeRange.weekly:
+        final dayFraction = (parsed.hour + (parsed.minute / 60.0)) / 24.0;
+
+        return (parsed.weekday - 1) + dayFraction;
+
+      case TimeRange.monthly:
+        final dayFraction = (parsed.hour + (parsed.minute / 60.0)) / 24.0;
+
+        return (parsed.day - 1) + dayFraction;
+    }
   }
 
   List<FlSpot> _buildTrendSpots({
@@ -161,15 +176,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         return;
       }
 
-      List<dynamic> history;
-
-      if (_timeRange == TimeRange.daily) {
-        history = await ApiService.getSensorHistory(hours: 24);
-      } else if (_timeRange == TimeRange.weekly) {
-        history = await ApiService.getSensorHistory(days: 7);
-      } else {
-        history = await ApiService.getSensorHistory(days: 30);
-      }
+      final history = await ApiService.getSensorHistory(
+        period: _timeRange == TimeRange.daily
+            ? 'today'
+            : _timeRange == TimeRange.weekly
+                ? 'week'
+                : 'month',
+      );
 
       final rangeStart = _rangeStart();
 
@@ -860,12 +873,22 @@ class _TrendChart extends StatelessWidget {
   String get _rangeLabel {
     switch (timeRange) {
       case TimeRange.daily:
-        return 'Utolsó 24 óra';
+        return 'Mai nap';
       case TimeRange.weekly:
-        return 'Utolsó 7 nap';
+        return 'Aktuális hét';
       case TimeRange.monthly:
-        return 'Utolsó 30 nap';
+        return 'Aktuális hónap';
     }
+  }
+
+  int _daysInCurrentMonth() {
+    final now = DateTime.now();
+    final firstDayNextMonth = DateTime(now.year, now.month + 1, 1);
+    final lastDayThisMonth = firstDayNextMonth.subtract(
+      const Duration(days: 1),
+    );
+
+    return lastDayThisMonth.day;
   }
 
   double get _maxX {
@@ -875,14 +898,14 @@ class _TrendChart extends StatelessWidget {
       case TimeRange.weekly:
         return 7;
       case TimeRange.monthly:
-        return 30;
+        return _daysInCurrentMonth().toDouble();
     }
   }
 
   double get _bottomInterval {
     switch (timeRange) {
       case TimeRange.daily:
-        return 6;
+        return 4;
       case TimeRange.weekly:
         return 1;
       case TimeRange.monthly:
@@ -891,18 +914,32 @@ class _TrendChart extends StatelessWidget {
   }
 
   String _bottomLabel(double value) {
-    final v = value.toInt();
-
     switch (timeRange) {
       case TimeRange.daily:
-        if (v == 24) return '';
-        return '${v.toString().padLeft(2, '0')}:00';
+        final hour = value.toInt();
+
+        if (hour == 24) return '';
+
+        return '${hour.toString().padLeft(2, '0')}:00';
+
       case TimeRange.weekly:
-        if (v == 0) return '';
-        return '$v. nap';
+        const days = ['H', 'K', 'Sze', 'Cs', 'P', 'Szo', 'V'];
+        final index = value.toInt();
+
+        if (index < 0 || index >= days.length) {
+          return '';
+        }
+
+        return days[index];
+
       case TimeRange.monthly:
-        if (v == 0) return '';
-        return '$v';
+        final day = value.toInt() + 1;
+
+        if (day <= 0 || day > _maxX.toInt()) {
+          return '';
+        }
+
+        return day.toString();
     }
   }
 
@@ -915,10 +952,34 @@ class _TrendChart extends StatelessWidget {
         return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
 
       case TimeRange.weekly:
-        return '${x.toStringAsFixed(1)}. nap';
+        const days = [
+          'Hétfő',
+          'Kedd',
+          'Szerda',
+          'Csütörtök',
+          'Péntek',
+          'Szombat',
+          'Vasárnap',
+        ];
+
+        final index = x.floor().clamp(0, 6);
+        final fraction = x - x.floor();
+        final totalMinutes = (fraction * 24 * 60).round();
+
+        final hour = totalMinutes ~/ 60;
+        final minute = totalMinutes % 60;
+
+        return '${days[index]} ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
 
       case TimeRange.monthly:
-        return '${x.toStringAsFixed(1)}. nap';
+        final day = x.floor() + 1;
+        final fraction = x - x.floor();
+        final totalMinutes = (fraction * 24 * 60).round();
+
+        final hour = totalMinutes ~/ 60;
+        final minute = totalMinutes % 60;
+
+        return '$day. nap ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
     }
   }
 

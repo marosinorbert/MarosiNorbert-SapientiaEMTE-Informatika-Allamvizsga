@@ -95,15 +95,18 @@ class ApiService {
     int? hours,
     int? days,
     bool today = false,
+    String? period,
   }) async {
     String url = '$baseUrl/sensors/history';
 
-    if (today) {
+    if (period != null) {
+      url += '?period=$period';
+    } else if (today) {
       url += '?today=true';
-    } else if (hours != null) {
-      url += '?hours=$hours';
     } else if (days != null) {
       url += '?days=$days';
+    } else {
+      url += '?hours=${hours ?? 24}';
     }
 
     final response = await http.get(
@@ -115,10 +118,7 @@ class ApiService {
       return jsonDecode(response.body);
     }
 
-    throw Exception(
-      'Nem sikerült lekérni az előzményeket. '
-      'Status: ${response.statusCode}',
-    );
+    throw Exception('Nem sikerült lekérni a szenzor előzményeket');
   }
 
   static Future<String> exportSensorDataCsv({

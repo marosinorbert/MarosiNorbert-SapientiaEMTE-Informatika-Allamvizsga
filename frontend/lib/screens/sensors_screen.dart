@@ -87,9 +87,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
         return;
       }
       final latestJson = await ApiService.getLatestSensorData();
-      final historyJson = await ApiService.getSensorHistory(
-        hours: 24,
-      );
+      final historyJson = await ApiService.getSensorHistory(period: 'today');
       final temperature = (latestJson['temperature'] ?? 0).toDouble();
       final humidity = (latestJson['humidity'] ?? 0).toDouble();
       final soilMoisture = (latestJson['soilMoisture'] ?? 0).toDouble();
@@ -304,7 +302,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
           const SizedBox(height: 24),
 
           ChartCard(
-            title: 'Hőmérséklet — 24 órás trend',
+            title: 'Hőmérséklet — 24 órás trend (ma)',
             spots: _tempSpots.isEmpty ? [const FlSpot(0, 0)] : _tempSpots,
             lineColor: AppTheme.primary,
             fillColor: AppTheme.primary.withOpacity(0.1),
@@ -316,7 +314,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
           const SizedBox(height: 24),
 
           ChartCard(
-            title: 'Talajnedvesség — 24 órás trend',
+            title: 'Talajnedvesség — 24 órás trend (ma)',
             spots: _soilSpots.isEmpty ? [const FlSpot(0, 0)] : _soilSpots,
             lineColor: const Color(0xFF8B5CF6),
             fillColor: const Color(0xFF8B5CF6).withOpacity(0.1),
@@ -328,7 +326,7 @@ class _SensorsScreenState extends State<SensorsScreen> {
           const SizedBox(height: 24),
 
           ChartCard(
-            title: 'Fényerő — 24 órás trend',
+            title: 'Fényerő — 24 órás trend (ma)',
             spots: _lightSpots.isEmpty ? [const FlSpot(0, 0)] : _lightSpots,
             lineColor: const Color(0xFFF59E0B),
             fillColor: const Color(0xFFF59E0B).withOpacity(0.1),

@@ -168,19 +168,45 @@ router.get('/export/csv', authMiddleware, async (req, res) => {
 });
 
 router.get('/history', authMiddleware, async (req, res) => {
-  const { hours, days, today } = req.query;
+  const { hours, days, today, period } = req.query;
 
   let result;
 
-  if (today === 'true') {
+  if (period === 'today' || today === 'true') {
     result = await pool.query(
       `
       SELECT *,
         ${localTimeSql('created_at', 'created_at_formatted')}
       FROM sensor_data
       WHERE user_id = $1
-      AND created_at >= CURRENT_DATE
-      AND created_at < CURRENT_DATE + INTERVAL '1 day'
+      AND created_at >= date_trunc('day', CURRENT_TIMESTAMP)
+      AND created_at < date_trunc('day', CURRENT_TIMESTAMP) + INTERVAL '1 day'
+      ORDER BY created_at ASC
+      `,
+      [req.user.id]
+    );
+  } else if (period === 'week') {
+    result = await pool.query(
+      `
+      SELECT *,
+        ${localTimeSql('created_at', 'created_at_formatted')}
+      FROM sensor_data
+      WHERE user_id = $1
+      AND created_at >= date_trunc('week', CURRENT_TIMESTAMP)
+      AND created_at < date_trunc('week', CURRENT_TIMESTAMP) + INTERVAL '7 days'
+      ORDER BY created_at ASC
+      `,
+      [req.user.id]
+    );
+  } else if (period === 'month') {
+    result = await pool.query(
+      `
+      SELECT *,
+        ${localTimeSql('created_at', 'created_at_formatted')}
+      FROM sensor_data
+      WHERE user_id = $1
+      AND created_at >= date_trunc('month', CURRENT_TIMESTAMP)
+      AND created_at < date_trunc('month', CURRENT_TIMESTAMP) + INTERVAL '1 month'
       ORDER BY created_at ASC
       `,
       [req.user.id]
