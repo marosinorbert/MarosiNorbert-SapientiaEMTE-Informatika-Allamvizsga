@@ -280,14 +280,6 @@ class _Esp32ScreenState extends State<Esp32Screen> {
                         signal: _signalStrength,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatusBadge(
-                        icon: Icons.cloud_rounded,
-                        label: 'MQTT',
-                        isConnected: _mqttConnected,
-                      ),
-                    ),
                   ],
                 ),
               ],
@@ -517,14 +509,14 @@ class _StatusBadge extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: Colors.white),
+              Icon(icon, size: 16, color: const Color.fromARGB(255, 2, 56, 4)),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white,
+                  color: const Color.fromARGB(255, 2, 56, 4),
                 ),
               ),
             ],
@@ -537,8 +529,8 @@ class _StatusBadge extends StatelessWidget {
                 height: 8,
                 decoration: BoxDecoration(
                   color: isConnected
-                      ? Colors.white
-                      : Colors.white.withOpacity(0.5),
+                      ? const Color.fromARGB(255, 2, 56, 4)
+                      : const Color.fromARGB(255, 2, 56, 4).withOpacity(0.5),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -547,7 +539,7 @@ class _StatusBadge extends StatelessWidget {
                 isConnected ? 'Csatlakozva' : 'Lecsatlakozva',
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.white.withOpacity(0.9),
+                  color: Color.fromARGB(255, 2, 56, 4).withOpacity(isConnected ? 1 : 0.5),
                   fontWeight: FontWeight.w600,
                 ),
               ),
