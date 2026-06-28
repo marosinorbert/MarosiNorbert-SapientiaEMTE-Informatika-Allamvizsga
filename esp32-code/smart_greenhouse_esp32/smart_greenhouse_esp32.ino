@@ -31,6 +31,9 @@ const char *API_BASE_URL = "https://cultivate-radar-swimmer.ngrok-free.dev/api";
 #define PUMP_RELAY_PIN 3
 #define LIGHT_PIN 38
 
+#define FAN_PIN 21
+#define HEATER_PIN 47
+
 // Relay logic
 #define RELAY_ON LOW
 #define RELAY_OFF HIGH
@@ -64,6 +67,8 @@ int lightRaw = 0;
 
 bool pumpOn = false;
 bool lightOn = false;
+bool fanOn = false;
+bool heaterOn = false;
 
 int readSoilMoisturePercent() {
   int raw = analogRead(SOIL_AO_PIN);
@@ -104,6 +109,16 @@ void setLight(bool state) {
   digitalWrite(LIGHT_PIN, state ? HIGH : LOW);
 }
 
+void setFan(bool state) {
+  fanOn = state;
+  digitalWrite(FAN_PIN, state ? HIGH : LOW);
+}
+
+void setHeater(bool state) {
+  heaterOn = state;
+  digitalWrite(HEATER_PIN, state ? HIGH : LOW);
+}
+
 void readSensors() {
   float t = dht.readTemperature();
   float h = dht.readHumidity();
@@ -137,15 +152,18 @@ void sendSensorData() {
   http.addHeader("ngrok-skip-browser-warning", "true");
   http.addHeader("x-device-token", DEVICE_TOKEN);
 
-  StaticJsonDocument<384> doc;
+  StaticJsonDocument<512> doc;
   doc["temperature"] = temperature;
   doc["humidity"] = humidity;
   doc["soilMoisture"] = soilPercent;
   doc["lightIntensity"] = lightPercent;
   doc["lightRaw"] = lightRaw;
   doc["waterDetected"] = waterDetected;
+
   doc["lightOn"] = lightOn;
   doc["pumpOn"] = pumpOn;
+  doc["fanOn"] = fanOn;
+  doc["heaterOn"] = heaterOn;
 
   String body;
   serializeJson(doc, body);
@@ -177,13 +195,19 @@ void fetchCommands() {
   if (code == 200) {
     String payload = http.getString();
 
-    StaticJsonDocument<256> doc;
+    Serial.print("Commands payload: ");
+    Serial.println(payload);
+
+    StaticJsonDocument<384> doc;
     DeserializationError error = deserializeJson(doc, payload);
 
     if (!error) {
       bool commandPump = doc["pump"] | false;
       bool commandLight = doc["light"] | false;
+      bool commandFan = doc["fan"] | false;
+      bool commandHeater = doc["heater"] | false;
 
+      // Ha nincs víz, a pumpát biztonsági okból nem engedjük bekapcsolni.
       if (!waterDetected && commandPump) {
         setPump(false);
       } else {
@@ -191,6 +215,11 @@ void fetchCommands() {
       }
 
       setLight(commandLight);
+      setFan(commandFan);
+      setHeater(commandHeater);
+    } else {
+      Serial.print("JSON parse error: ");
+      Serial.println(error.c_str());
     }
   }
 
@@ -257,7 +286,7 @@ void drawDisplay() {
     display.print("Light:");
     display.print(lightPercent);
     display.println(" %");
-  } else {
+  } else if (displayPage == 1) {
     display.print("Water: ");
     display.println(waterDetected ? "OK" : "EMPTY");
 
@@ -269,6 +298,18 @@ void drawDisplay() {
 
     display.print("WiFi: ");
     display.println(WiFi.status() == WL_CONNECTED ? "OK" : "NO");
+  } else {
+    display.print("Fan:    ");
+    display.println(fanOn ? "ON" : "OFF");
+
+    display.print("Heater: ");
+    display.println(heaterOn ? "ON" : "OFF");
+
+    display.print("IP:");
+    display.println(WiFi.localIP());
+
+    display.print("RSSI:");
+    display.println(WiFi.RSSI());
   }
 
   display.display();
@@ -301,9 +342,13 @@ void setup() {
 
   pinMode(PUMP_RELAY_PIN, OUTPUT);
   pinMode(LIGHT_PIN, OUTPUT);
+  pinMode(FAN_PIN, OUTPUT);
+  pinMode(HEATER_PIN, OUTPUT);
 
   setPump(false);
   setLight(false);
+  setFan(false);
+  setHeater(false);
 
   dht.begin();
 
@@ -343,7 +388,7 @@ void loop() {
 
   if (now - lastDisplayChange >= DISPLAY_INTERVAL) {
     lastDisplayChange = now;
-    displayPage = (displayPage + 1) % 2;
+    displayPage = (displayPage + 1) % 3;
     drawDisplay();
   }
 }
